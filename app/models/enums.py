@@ -661,6 +661,9 @@ class TypeOrigineEcriture(str, Enum):
     MAINTENANCE = "MAINTENANCE"
     DECLARATION_FISCALE = "DECLARATION_FISCALE"
     MISSION_TRANSPORT = "MISSION_TRANSPORT"
+    COLLECTE = "COLLECTE"
+    AVANCE_COLLECTEUR = "AVANCE_COLLECTEUR"
+    REVERSEMENT_COLLECTEUR = "REVERSEMENT_COLLECTEUR"
     LITIGE_TRANSPORT = "LITIGE_TRANSPORT"
     SAISIE_MANUELLE = "SAISIE_MANUELLE"
 
@@ -766,3 +769,76 @@ class ZoneApplication(str, Enum):
     """Deux zones dans l'app chauffeur : publique (bourse) et mission."""
     PUBLIQUE = "PUBLIQUE"
     MISSION = "MISSION"
+
+
+# ===========================================================================
+# MODULE 8 : COLLECTE VILLAGE & CONSIGNATION
+# ===========================================================================
+class ModeDetention(str, Enum):
+    """
+    Statut juridique de la marchandise detenue dans les magasins DML.
+
+    ATTENTION COMPTABLE : MARGE_FIXE_TONNE est economiquement un achat-vente
+    (DML supporte le risque de prix et capte tout l'ecart au-dela du prix
+    convenu). Il est donc traite comme PROPRIETE dans les ecritures --
+    compte 701, marchandise au bilan -- position defendable en cas de
+    controle. Seul CONSIGNATION_POURCENTAGE est une vraie commission (706,
+    hors bilan).
+    """
+    PROPRIETE = "PROPRIETE"
+    CONSIGNATION_POURCENTAGE = "CONSIGNATION_POURCENTAGE"
+    MARGE_FIXE_TONNE = "MARGE_FIXE_TONNE"
+
+
+class TypeCollecteur(str, Enum):
+    INDEPENDANT = "INDEPENDANT"
+    SALARIE = "SALARIE"
+    COOPERATIVE = "COOPERATIVE"
+    GROSSISTE_MARCHE = "GROSSISTE_MARCHE"
+
+
+class StatutCollecteur(str, Enum):
+    ACTIF = "ACTIF"
+    SUSPENDU = "SUSPENDU"
+    INACTIF = "INACTIF"
+    LISTE_NOIRE = "LISTE_NOIRE"
+
+
+class StatutAvanceCollecteur(str, Enum):
+    ACCORDEE = "ACCORDEE"
+    PARTIELLEMENT_JUSTIFIEE = "PARTIELLEMENT_JUSTIFIEE"
+    JUSTIFIEE = "JUSTIFIEE"
+    SOLDE_A_RENDRE = "SOLDE_A_RENDRE"
+    APUREE = "APUREE"
+    LITIGIEUSE = "LITIGIEUSE"
+
+
+class StatutCollecte(str, Enum):
+    EN_COURS = "EN_COURS"
+    CLOTUREE = "CLOTUREE"
+    EXPEDIEE = "EXPEDIEE"
+    RECEPTIONNEE = "RECEPTIONNEE"
+    ANNULEE = "ANNULEE"
+
+
+class BaseAchatMarche(str, Enum):
+    """Comment le collecteur paie au marche."""
+    AU_SAC = "AU_SAC"
+    AU_KG = "AU_KG"
+    AU_TAS = "AU_TAS"
+
+
+class AppreciationQualiteMarche(str, Enum):
+    """Estimation sans instrument, telle que pratiquee au marche."""
+    SEC = "SEC"
+    MOYEN = "MOYEN"
+    HUMIDE = "HUMIDE"
+    NON_APPRECIE = "NON_APPRECIE"
+
+
+class StatutReversement(str, Enum):
+    A_PAYER = "A_PAYER"
+    PARTIEL = "PARTIEL"
+    PAYE = "PAYE"
+    COMPENSE_AVANCE = "COMPENSE_AVANCE"
+    BLOQUE_LITIGE = "BLOQUE_LITIGE"

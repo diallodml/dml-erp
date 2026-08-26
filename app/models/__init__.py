@@ -142,6 +142,17 @@ from .transport import (
     VentilationCoutVoyage,
 )
 
+# --- Module 8 : Collecte village & consignation
+from .collecte import (
+    AvanceCollecteur,
+    Collecte,
+    Collecteur,
+    ContratConsignation,
+    LigneCollecte,
+    ReversementCollecteur,
+    ZoneCollecte,
+)
+
 __all__ = [
     # Socle
     "Base", "BaseModel", "DocumentModel", "ReferentielModel",
@@ -178,4 +189,7 @@ __all__ = [
     "NegociationFret", "AttributionFret", "MissionTransport",
     "LigneMarchandiseTiers", "LettreDeVoiture", "VentilationCoutVoyage",
     "LitigeTransport", "ProfilTransporteur", "SessionMobile", "AccesMission",
+    # Collecte & consignation
+    "ZoneCollecte", "Collecteur", "ContratConsignation", "AvanceCollecteur",
+    "Collecte", "LigneCollecte", "ReversementCollecteur",
 ]

@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: dml_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dml
+      POSTGRES_PASSWORD: dml_dev_2026
+      POSTGRES_DB: dml_erp
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

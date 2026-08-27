@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tableau de bord — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Tableau de bord</h1>
+    <p>Ce que les collecteurs doivent, ce que les sacs ont perdu en route, ce qui dort en magasin.</p>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <!-- SIGNATURE : l'ecart cumule, en fleau de balance -->
+  <section id="bloc-ecart"></section>
+
+  <section id="bloc-cartes">
+    <h2>En un coup d'œil</h2>
+    <div class="cartes" id="cartes"></div>
+  </section>
+
+  <section id="bloc-avances">
+    <h2>Avances en cours</h2>
+    <div id="table-avances"></div>
+  </section>
+
+  <section id="bloc-ecarts">
+    <h2>Écarts par collecteur</h2>
+    <div id="table-ecarts"></div>
+  </section>
+
+  <section id="bloc-stock">
+    <h2>Marchandise en magasin</h2>
+    <div id="table-stock"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/tableau");
+
+const MODES = {
+  PROPRIETE: "À DML",
+  MARGE_FIXE_TONNE: "Marge fixe",
+  CONSIGNATION_POURCENTAGE: "En dépôt",
+};
+
+function vide(texte) {
+  return `<div class="vide">${texte}</div>`;
+}
+
+function table(entetes, lignes) {
+  if (!lignes.length) return null;
+  return `<div class="enveloppe-table"><table>
+    <thead><tr>${entetes.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+    <tbody>${lignes.join("")}</tbody>
+  </table></div>`;
+}
+
+async function charger() {
+  let avances = [], ecarts = [], stock = [];
+
+  try { avances = await DML.api("/api/v1/collecte/avances/soldes"); }
+  catch (e) { document.getElementById("bloc-avances").hidden = true; }
+
+  try { ecarts = await DML.api("/api/v1/collecte/tableau/ecarts"); }
+  catch (e) { document.getElementById("bloc-ecarts").hidden = true; document.getElementById("bloc-ecart").hidden = true; }
+
+  try { stock = await DML.api("/api/v1/collecte/tableau/stock"); }
+  catch (e) { document.getElementById("bloc-stock").hidden = true; }
+
+  // --- Fleau de balance : l'ecart cumule
+  const theo = ecarts.reduce((s, e) => s + Number(e.poids_theorique_kg || 0), 0);
+  const reel = ecarts.reduce((s, e) => s + Number(e.poids_reel_kg || 0), 0);
+  const ecartKg = reel - theo;
+  const valeur = ecarts.reduce((s, e) => s + Number(e.valeur_ecart || 0), 0);
+
+  if (theo > 0) {
+    const part = Math.max(0, Math.min(100, (reel / theo) * 100));
+    document.getElementById("bloc-ecart").innerHTML = `
+      <div class="balance">
+        <div class="titre">Payé au marché, reçu au magasin</div>
+        <div class="chiffre ${ecartKg < 0 ? "negatif" : "positif"}">${ecartKg > 0 ? "+" : ""}${DML.kg(ecartKg)}</div>
+        <div class="sous">
+          ${ecartKg < 0
+            ? `Soit <strong>${DML.fcfa(Math.abs(valeur))}</strong> payés pour de la marchandise qui n'est pas arrivée.`
+            : "Le poids reçu dépasse le poids annoncé au marché."}
+        </div>
+        <div class="fleau">
+          <div class="rail"><div class="paye"></div><div class="recu" style="width:${part}%"></div></div>
+          <div class="legende"><span>Reçu ${DML.kg(reel)}</span><span>Payé ${DML.kg(theo)}</span></div>
+        </div>
+      </div>`;
+  } else {
+    document.getElementById("bloc-ecart").hidden = true;
+  }
+
+  // --- Cartes
+  const resteTotal = avances.reduce((s, a) => s + Number(a.reste_du || 0), 0);
+  const tonnesStock = stock.reduce((s, l) => s + Number(l.tonnes || 0), 0);
+  const valeurStock = stock.reduce((s, l) => s + Number(l.valeur || 0), 0);
+
+  document.getElementById("cartes").innerHTML = `
+    <div class="carte">
+      <span class="etiquette">Avances non justifiées</span>
+      <div class="valeur ${resteTotal > 0 ? "alerte" : ""}">${DML.fcfa(resteTotal)}</div>
+      <div class="note">${avances.length} collecteur${avances.length > 1 ? "s" : ""} concerné${avances.length > 1 ? "s" : ""}</div>
+    </div>
+    <div class="carte">
+      <span class="etiquette">Perte sur écarts</span>
+      <div class="valeur ${valeur < 0 ? "alerte" : ""}">${DML.fcfa(Math.abs(valeur))}</div>
+      <div class="note">sur ${ecarts.reduce((s, e) => s + e.nb_collectes, 0)} collecte(s) reçue(s)</div>
+    </div>
+    <div class="carte">
+      <span class="etiquette">En magasin</span>
+      <div class="valeur">${DML.tonnes(tonnesStock)}</div>
+      <div class="note">valorisé ${DML.fcfa(valeurStock)}</div>
+    </div>`;
+
+  // --- Avances
+  document.getElementById("table-avances").innerHTML =
+    table(["Collecteur", "Remis", "Justifié", "Reste dû", "Avances"],
+      avances.map(a => `<tr>
+        <td>${a.nom}</td>
+        <td class="num">${DML.fcfa(a.total_avance)}</td>
+        <td class="num">${DML.fcfa(a.total_justifie)}</td>
+        <td class="num ${Number(a.reste_du) > 0 ? "negatif" : ""}">${DML.fcfa(a.reste_du)}</td>
+        <td class="num">${a.nb_avances_ouvertes}</td>
+      </tr>`))
+    || vide("Aucune avance en cours. Les avances remises apparaîtront ici.");
+
+  // --- Ecarts
+  document.getElementById("table-ecarts").innerHTML =
+    table(["Collecteur", "Collectes", "Payé", "Reçu", "Écart", "%", "Valeur"],
+      ecarts.map(e => `<tr>
+        <td>${e.nom}</td>
+        <td class="num">${e.nb_collectes}</td>
+        <td class="num">${DML.kg(e.poids_theorique_kg)}</td>
+        <td class="num">${DML.kg(e.poids_reel_kg)}</td>
+        <td class="num ${Number(e.ecart_kg) < 0 ? "negatif" : ""}">${DML.kg(e.ecart_kg)}</td>
+        <td class="num ${Number(e.ecart_kg) < 0 ? "negatif" : ""}">${e.ecart_pourcentage ?? "—"}</td>
+        <td class="num ${Number(e.valeur_ecart) < 0 ? "negatif" : ""}">${DML.fcfa(e.valeur_ecart)}</td>
+      </tr>`))
+    || vide("Aucune collecte réceptionnée. Pesez une arrivée pour voir les écarts.");
+
+  // --- Stock
+  document.getElementById("table-stock").innerHTML =
+    table(["Magasin", "Produit", "Détention", "Lots", "Quantité", "Valeur"],
+      stock.map(l => `<tr>
+        <td>${l.magasin}</td>
+        <td>${l.produit}</td>
+        <td>${MODES[l.mode_detention] || l.mode_detention}</td>
+        <td class="num">${l.nb_lots}</td>
+        <td class="num">${DML.tonnes(l.tonnes)}</td>
+        <td class="num">${DML.fcfa(l.valeur)}</td>
+      </tr>`))
+    || vide("Aucune marchandise en stock. Entrez une collecte réceptionnée en stock.");
+}
+
+charger();
+</script>
+</body>
+</html>

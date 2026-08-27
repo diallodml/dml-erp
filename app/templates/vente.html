@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Livraisons — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Livraisons et reversements</h1>
+    <p>Sortez la marchandise du magasin, puis payez le collecteur sur ce qui lui revient.</p>
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" data-vue="livrer" aria-selected="true">Livrer un client</button>
+    <button role="tab" data-vue="reverser" aria-selected="false">Reversements dus</button>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <section id="vue-livrer">
+    <fieldset>
+      <legend>Livrer une commande</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="l_lot">Lot à livrer</label>
+          <select id="l_lot" onchange="majDisponible()"></select>
+        </div>
+        <div>
+          <label for="l_client">Client</label>
+          <input id="l_client" type="text" placeholder="Brasserie du Littoral">
+        </div>
+        <div>
+          <label for="l_date">Date de livraison</label>
+          <input id="l_date" type="datetime-local">
+        </div>
+        <div>
+          <label for="l_qte">Quantité livrée
+            <span class="aide" id="dispo">en kg</span>
+          </label>
+          <input id="l_qte" type="number" min="1" step="1" oninput="majApercu()">
+        </div>
+        <div>
+          <label for="l_montant">Montant de la vente
+            <span class="aide">en FCFA, hors taxes</span>
+          </label>
+          <input id="l_montant" type="number" min="0" step="1000" oninput="majApercu()">
+        </div>
+        <div>
+          <label for="l_frais">Frais à déduire
+            <span class="aide">transport, manutention</span>
+          </label>
+          <input id="l_frais" type="number" min="0" step="1000" value="0">
+        </div>
+      </div>
+
+      <div id="apercu" class="message ok" hidden></div>
+
+      <div class="actions">
+        <button class="bouton" onclick="livrer()">Enregistrer la livraison</button>
+      </div>
+    </fieldset>
+
+    <div id="resultat"></div>
+  </section>
+
+  <section id="vue-reverser" hidden>
+    <h2>Ce que DML doit aux collecteurs</h2>
+    <div id="table-reversements"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/vente");
+
+const PEUT_PAYER = DML.peut("vente.reversement.payer");
+let LOTS = [];
+
+document.querySelectorAll('[role="tab"]').forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
+    b.setAttribute("aria-selected", "true");
+    ["livrer", "reverser"].forEach(v =>
+      document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
+    DML.cacherMessage("msg");
+    if (b.dataset.vue === "reverser") listerReversements();
+  });
+});
+
+async function charger() {
+  document.getElementById("l_date").value = new Date().toISOString().slice(0, 16);
+  try {
+    LOTS = await DML.api("/api/v1/vente/lots");
+    document.getElementById("l_lot").innerHTML = LOTS.length
+      ? LOTS.map(l => `<option value="${l.id}">${l.nom}</option>`).join("")
+      : '<option value="">Aucun lot en stock</option>';
+    majDisponible();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function lotChoisi() {
+  const id = document.getElementById("l_lot").value;
+  return LOTS.find(l => l.id === id);
+}
+
+function majDisponible() {
+  const lot = lotChoisi();
+  const el = document.getElementById("dispo");
+  if (!lot) { el.textContent = "en kg"; return; }
+  el.textContent = `en kg — ${DML.kg(lot.disponible_kg)} disponibles`;
+  document.getElementById("l_qte").max = lot.disponible_kg;
+  majApercu();
+}
+
+function majApercu() {
+  const lot = lotChoisi();
+  const qte = Number(document.getElementById("l_qte").value) || 0;
+  const vente = Number(document.getElementById("l_montant").value) || 0;
+  const el = document.getElementById("apercu");
+
+  if (!lot || !qte) { el.hidden = true; return; }
+
+  const cout = qte * Number(lot.cout_unitaire);
+  const marge = vente - cout;
+  el.hidden = false;
+  el.className = "message " + (marge >= 0 ? "ok" : "erreur");
+  el.innerHTML = vente
+    ? `Coût de la marchandise : <strong>${DML.fcfa(cout)}</strong>
+       (${lot.cout_unitaire} F/kg) — marge brute
+       <strong>${DML.fcfa(marge)}</strong>${marge < 0 ? " : vous vendez à perte." : ""}`
+    : `Coût de la marchandise : <strong>${DML.fcfa(cout)}</strong> (${lot.cout_unitaire} F/kg)`;
+}
+
+async function livrer() {
+  DML.cacherMessage("msg");
+  const lot = lotChoisi();
+  if (!lot) { DML.message("msg", "Choisissez un lot.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/vente/livraisons", {
+      method: "POST",
+      body: JSON.stringify({
+        lot_id: lot.id,
+        date_livraison: document.getElementById("l_date").value + ":00Z",
+        quantite_kg: Number(document.getElementById("l_qte").value),
+        montant_vente: Number(document.getElementById("l_montant").value),
+        client_nom: document.getElementById("l_client").value || null,
+        frais_deduits: Number(document.getElementById("l_frais").value) || 0,
+      }),
+    });
+    afficherResultat(r);
+    document.getElementById("l_qte").value = "";
+    document.getElementById("l_montant").value = "";
+    document.getElementById("apercu").hidden = true;
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function afficherResultat(r) {
+  const rev = r.reversement;
+  const marge = Number(r.montant_vente) - Number(r.cout_marchandise);
+  document.getElementById("resultat").innerHTML = `
+    <div class="balance">
+      <div class="titre">Livraison enregistrée — ${r.lot}</div>
+      <div class="chiffre ${marge >= 0 ? "positif" : "negatif"}">${DML.fcfa(marge)}</div>
+      <div class="sous">
+        Marge brute sur ${DML.kg(r.quantite_livree_kg)} livrés.
+        Reste en magasin : <strong>${DML.kg(r.reste_en_stock_kg)}</strong>.
+      </div>
+      ${rev ? `
+      <div class="cartes" style="margin-top:16px">
+        <div class="carte"><span class="etiquette">Part DML</span>
+          <div class="valeur">${DML.fcfa(rev.part_dml)}</div></div>
+        <div class="carte"><span class="etiquette">Avance compensée</span>
+          <div class="valeur">${DML.fcfa(rev.avance_compensee)}</div></div>
+        <div class="carte"><span class="etiquette">Dû au collecteur</span>
+          <div class="valeur">${DML.fcfa(rev.net_du_collecteur)}</div>
+          <div class="note">${rev.numero}</div></div>
+      </div>` : ""}
+    </div>`;
+}
+
+async function listerReversements() {
+  try {
+    const liste = await DML.api("/api/v1/vente/reversements");
+    if (!liste.length) {
+      document.getElementById("table-reversements").innerHTML =
+        '<div class="vide">Aucun reversement en attente.</div>';
+      return;
+    }
+    document.getElementById("table-reversements").innerHTML = `
+      <div class="enveloppe-table"><table>
+        <thead><tr>
+          <th>Pièce</th><th>Collecteur</th><th>Calculé le</th><th>Tonnage</th>
+          <th>Vente</th><th>Part DML</th><th>Avance</th><th>Solde</th>
+          ${PEUT_PAYER ? "<th></th>" : ""}
+        </tr></thead>
+        <tbody>${liste.map(r => `<tr>
+          <td>${r.numero}</td>
+          <td>${r.collecteur}</td>
+          <td>${r.date_calcul}</td>
+          <td class="num">${DML.tonnes(r.tonnage)}</td>
+          <td class="num">${DML.fcfa(r.vente_brut)}</td>
+          <td class="num">${DML.fcfa(r.part_dml)}</td>
+          <td class="num">${DML.fcfa(r.avance_compensee)}</td>
+          <td class="num">${DML.fcfa(r.solde)}</td>
+          ${PEUT_PAYER ? `<td><button class="bouton secondaire"
+             style="padding:5px 12px;font-size:13px"
+             onclick="payer('${r.id}','${r.collecteur.replace(/'/g, "\\'")}',${r.solde})">
+             Payer</button></td>` : ""}
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+  } catch (e) {
+    document.getElementById("table-reversements").innerHTML =
+      `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function payer(id, nom, solde) {
+  const saisi = prompt(`Montant à verser à ${nom}, en FCFA :`, solde);
+  if (saisi === null) return;
+  try {
+    const r = await DML.api(`/api/v1/vente/reversements/${id}/paiement`, {
+      method: "POST",
+      body: JSON.stringify({
+        montant_paye: Number(saisi),
+        date_paiement: new Date().toISOString().slice(0, 10),
+        mode_paiement: "MOBILE_MONEY",
+      }),
+    });
+    DML.message("msg", `${r.numero} — ${DML.fcfa(r.montant_paye)} versés. Solde : ${DML.fcfa(r.solde)}.`, "ok");
+    listerReversements();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+charger();
+</script>
+</body>
+</html>

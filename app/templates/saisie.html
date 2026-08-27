@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saisie — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Saisie</h1>
+    <p>Enregistrez ce que les collecteurs rapportent, puis la pesée à l'arrivée au magasin.</p>
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" data-vue="avance" aria-selected="true">Avance</button>
+    <button role="tab" data-vue="collecte" aria-selected="false">Collecte</button>
+    <button role="tab" data-vue="reception" aria-selected="false">Réception</button>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <!-- ===== AVANCE ===== -->
+  <section id="vue-avance">
+    <fieldset>
+      <legend>Remettre une avance</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="a_collecteur">Collecteur</label>
+          <select id="a_collecteur"></select>
+        </div>
+        <div>
+          <label for="a_date">Date de remise</label>
+          <input id="a_date" type="date">
+        </div>
+        <div>
+          <label for="a_montant">Montant remis
+            <span class="aide">en FCFA</span>
+          </label>
+          <input id="a_montant" type="number" min="1" step="1000">
+        </div>
+        <div>
+          <label for="a_mode">Mode</label>
+          <select id="a_mode">
+            <option value="ESPECES">Espèces</option>
+            <option value="MOBILE_MONEY">Mobile Money</option>
+            <option value="VIREMENT">Virement</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="a_objet">Objet</label>
+        <input id="a_objet" type="text" placeholder="Achat maïs marché de Guider">
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="enregistrerAvance()">Enregistrer l'avance</button>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- ===== COLLECTE ===== -->
+  <section id="vue-collecte" hidden>
+    <fieldset>
+      <legend>Ouvrir une collecte</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="c_collecteur">Collecteur</label>
+          <select id="c_collecteur"></select>
+        </div>
+        <div>
+          <label for="c_zone">Marché</label>
+          <select id="c_zone"></select>
+        </div>
+        <div>
+          <label for="c_date">Date de début</label>
+          <input id="c_date" type="date">
+        </div>
+        <div>
+          <label for="c_mode">Mode de détention
+            <span class="aide">se fige à la création</span>
+          </label>
+          <select id="c_mode">
+            <option value="MARGE_FIXE_TONNE">Marge fixe par tonne</option>
+            <option value="PROPRIETE">Achat ferme</option>
+            <option value="CONSIGNATION_POURCENTAGE">Commission (%)</option>
+          </select>
+        </div>
+        <div>
+          <label for="c_marge">Marge par tonne
+            <span class="aide">en FCFA</span>
+          </label>
+          <input id="c_marge" type="number" min="0" step="500" value="15000">
+        </div>
+        <div>
+          <label for="c_frais">Frais annexes
+            <span class="aide">manutention, taxes, sacherie</span>
+          </label>
+          <input id="c_frais" type="number" min="0" step="1000" value="0">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="ouvrirCollecte()">Ouvrir la collecte</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ajouter un achat au marché</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="l_collecte">Collecte</label>
+          <select id="l_collecte"></select>
+        </div>
+        <div>
+          <label for="l_produit">Produit</label>
+          <select id="l_produit"></select>
+        </div>
+        <div>
+          <label for="l_date">Date d'achat</label>
+          <input id="l_date" type="date">
+        </div>
+        <div>
+          <label for="l_sacs">Nombre de sacs</label>
+          <input id="l_sacs" type="number" min="1" step="1">
+        </div>
+        <div>
+          <label for="l_poids">Poids d'un sac
+            <span class="aide">en kg, tel qu'annoncé</span>
+          </label>
+          <input id="l_poids" type="number" min="1" step="1" value="100">
+        </div>
+        <div>
+          <label for="l_prix">Prix d'un sac
+            <span class="aide">en FCFA</span>
+          </label>
+          <input id="l_prix" type="number" min="1" step="100">
+        </div>
+        <div>
+          <label for="l_vendeur">Vendeur</label>
+          <input id="l_vendeur" type="text" placeholder="Coopérative de Guider">
+        </div>
+        <div>
+          <label for="l_qualite">Aspect du grain</label>
+          <select id="l_qualite">
+            <option value="NON_APPRECIE">Non apprécié</option>
+            <option value="SEC">Sec</option>
+            <option value="MOYEN">Moyen</option>
+            <option value="HUMIDE">Humide</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="ajouterLigne()">Ajouter l'achat</button>
+        <span id="total_ligne" class="qui" style="color:var(--texte-doux)"></span>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- ===== RECEPTION ===== -->
+  <section id="vue-reception" hidden>
+    <fieldset>
+      <legend>Peser à l'arrivée</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="r_collecte">Collecte</label>
+          <select id="r_collecte"></select>
+        </div>
+        <div>
+          <label for="r_magasin">Magasin</label>
+          <select id="r_magasin"></select>
+        </div>
+        <div>
+          <label for="r_date">Date d'arrivée</label>
+          <input id="r_date" type="datetime-local">
+        </div>
+        <div>
+          <label for="r_expedies">Sacs expédiés</label>
+          <input id="r_expedies" type="number" min="0" step="1">
+        </div>
+        <div>
+          <label for="r_recus">Sacs reçus</label>
+          <input id="r_recus" type="number" min="0" step="1">
+        </div>
+        <div>
+          <label for="r_poids">Poids pesé
+            <span class="aide">en kg, sur la bascule</span>
+          </label>
+          <input id="r_poids" type="number" min="1" step="1">
+        </div>
+        <div>
+          <label for="r_humidite">Humidité mesurée
+            <span class="aide">en %, à l'humidimètre</span>
+          </label>
+          <input id="r_humidite" type="number" min="0" max="100" step="0.1">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="receptionner()">Enregistrer la pesée</button>
+      </div>
+    </fieldset>
+
+    <div id="resultat"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/saisie");
+
+let REFS = { collecteurs: [], zones: [], produits: [], magasins: [], collectes: [] };
+
+// Les referentiels n'ont pas encore de route : on les lit une fois au chargement
+async function charger() {
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  ["a_date", "c_date", "l_date"].forEach(id => document.getElementById(id).value = aujourdhui);
+  document.getElementById("r_date").value = new Date().toISOString().slice(0, 16);
+
+  try {
+    REFS = await DML.api("/api/v1/collecte/referentiels");
+    remplir("a_collecteur", REFS.collecteurs);
+    remplir("c_collecteur", REFS.collecteurs);
+    remplir("c_zone", REFS.zones);
+    remplir("l_produit", REFS.produits);
+    remplir("r_magasin", REFS.magasins);
+    rafraichirCollectes();
+  } catch (e) {
+    DML.message("msg", e.message, "erreur");
+  }
+}
+
+function remplir(id, liste) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.innerHTML = liste.map(o => `<option value="${o.id}">${o.nom}</option>`).join("");
+}
+
+async function rafraichirCollectes() {
+  try {
+    const liste = await DML.api("/api/v1/collecte/referentiels/collectes");
+    ["l_collecte", "r_collecte"].forEach(id => {
+      const sel = document.getElementById(id);
+      if (sel) sel.innerHTML = liste.map(c =>
+        `<option value="${c.id}">${c.numero} — ${c.collecteur} (${c.statut})</option>`).join("");
+    });
+  } catch (e) { /* silencieux */ }
+}
+
+// --- Onglets
+document.querySelectorAll('[role="tab"]').forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
+    b.setAttribute("aria-selected", "true");
+    ["avance", "collecte", "reception"].forEach(v =>
+      document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
+    DML.cacherMessage("msg");
+  });
+});
+
+// --- Total indicatif de la ligne
+["l_sacs", "l_prix"].forEach(id =>
+  document.getElementById(id).addEventListener("input", () => {
+    const s = Number(document.getElementById("l_sacs").value) || 0;
+    const p = Number(document.getElementById("l_prix").value) || 0;
+    document.getElementById("total_ligne").textContent = s && p ? "Total : " + DML.fcfa(s * p) : "";
+  }));
+
+// --- Actions
+async function enregistrerAvance() {
+  DML.cacherMessage("msg");
+  try {
+    const r = await DML.api("/api/v1/collecte/avances", {
+      method: "POST",
+      body: JSON.stringify({
+        collecteur_id: document.getElementById("a_collecteur").value,
+        date_remise: document.getElementById("a_date").value,
+        montant_remis: Number(document.getElementById("a_montant").value),
+        mode_remise: document.getElementById("a_mode").value,
+        objet: document.getElementById("a_objet").value || null,
+      }),
+    });
+    DML.message("msg", `Avance ${r.numero} enregistrée — ${DML.fcfa(r.montant_remis)}.`, "ok");
+    document.getElementById("a_montant").value = "";
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function ouvrirCollecte() {
+  DML.cacherMessage("msg");
+  try {
+    const mode = document.getElementById("c_mode").value;
+    const r = await DML.api("/api/v1/collecte", {
+      method: "POST",
+      body: JSON.stringify({
+        collecteur_id: document.getElementById("c_collecteur").value,
+        zone_id: document.getElementById("c_zone").value,
+        date_debut: document.getElementById("c_date").value,
+        mode_detention: mode,
+        marge_fixe_tonne_appliquee: mode === "MARGE_FIXE_TONNE"
+          ? Number(document.getElementById("c_marge").value) : null,
+        frais_annexes: Number(document.getElementById("c_frais").value) || 0,
+      }),
+    });
+    DML.message("msg", `Collecte ${r.numero} ouverte.`, "ok");
+    rafraichirCollectes();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function ajouterLigne() {
+  DML.cacherMessage("msg");
+  const id = document.getElementById("l_collecte").value;
+  if (!id) { DML.message("msg", "Ouvrez d'abord une collecte.", "erreur"); return; }
+  try {
+    const r = await DML.api(`/api/v1/collecte/${id}/lignes`, {
+      method: "POST",
+      body: JSON.stringify({
+        produit_id: document.getElementById("l_produit").value,
+        date_achat: document.getElementById("l_date").value,
+        base_achat: "AU_SAC",
+        nombre_sacs: Number(document.getElementById("l_sacs").value),
+        poids_nominal_sac_kg: Number(document.getElementById("l_poids").value),
+        prix_unitaire: Number(document.getElementById("l_prix").value),
+        nom_vendeur: document.getElementById("l_vendeur").value || null,
+        appreciation_qualite: document.getElementById("l_qualite").value,
+      }),
+    });
+    DML.message("msg", `Achat ajouté — ${DML.fcfa(r.montant)}.`, "ok");
+    document.getElementById("l_sacs").value = "";
+    document.getElementById("total_ligne").textContent = "";
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function receptionner() {
+  DML.cacherMessage("msg");
+  const id = document.getElementById("r_collecte").value;
+  if (!id) { DML.message("msg", "Choisissez une collecte.", "erreur"); return; }
+  try {
+    const r = await DML.api(`/api/v1/collecte/${id}/reception`, {
+      method: "POST",
+      body: JSON.stringify({
+        magasin_destination_id: document.getElementById("r_magasin").value,
+        date_reception_magasin: document.getElementById("r_date").value + ":00Z",
+        nombre_sacs_expedies: Number(document.getElementById("r_expedies").value) || null,
+        nombre_sacs_recus: Number(document.getElementById("r_recus").value),
+        poids_reel_kg: Number(document.getElementById("r_poids").value),
+        taux_humidite_magasin: Number(document.getElementById("r_humidite").value) || null,
+      }),
+    });
+    afficherEcart(r);
+    rafraichirCollectes();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function afficherEcart(c) {
+  const ecart = Number(c.ecart_poids_kg) || 0;
+  const theo = Number(c.poids_theorique_kg) || 1;
+  const reel = Number(c.poids_reel_kg) || 0;
+  const part = Math.max(0, Math.min(100, (reel / theo) * 100));
+  const negatif = ecart < 0;
+
+  document.getElementById("resultat").innerHTML = `
+    <div class="balance">
+      <div class="titre">Écart entre le poids payé et le poids reçu</div>
+      <div class="chiffre ${negatif ? "negatif" : "positif"}">
+        ${ecart > 0 ? "+" : ""}${DML.kg(ecart)}
+      </div>
+      <div class="sous">
+        ${negatif
+          ? "Ces kilos ont été payés au marché mais ne sont pas arrivés."
+          : "Le poids reçu dépasse le poids annoncé."}
+        ${c.ecart_sacs != null ? ` Sacs : ${c.ecart_sacs > 0 ? "+" : ""}${c.ecart_sacs}.` : ""}
+      </div>
+      <div class="fleau">
+        <div class="rail">
+          <div class="paye"></div>
+          <div class="recu" style="width:${part}%"></div>
+        </div>
+        <div class="legende">
+          <span>Reçu ${DML.kg(reel)}</span>
+          <span>Payé ${DML.kg(theo)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+charger();
+</script>
+</body>
+</html>

@@ -99,17 +99,6 @@ def receptionner(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{collecte_id}", response_model=CollecteLire,
-            dependencies=[Depends(exiger_permission("collecte.collecte.lire"))])
-def lire_collecte(
-    collecte_id: UUID,
-    db: Session = Depends(get_db),
-    utilisateur: Utilisateur = Depends(utilisateur_courant),
-):
-    collecte = db.get(Collecte, collecte_id)
-    if collecte is None:
-        raise HTTPException(status_code=404, detail="Collecte introuvable")
-    return collecte
 
 
 # ---------------------------------------------------------------------------
@@ -160,3 +149,70 @@ def tableau_stock(
 ):
     """Combien de tonnes en magasin, et a qui appartiennent-elles ?"""
     return repo.etat_stock(db, magasin_id)
+
+
+@router.get("/referentiels", include_in_schema=False)
+def referentiels(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Listes deroulantes de la page de saisie."""
+    from app.models import Collecteur, Magasin, Produit, ZoneCollecte
+
+    return {
+        "collecteurs": [
+            {"id": str(c.id), "nom": c.nom}
+            for c in db.query(Collecteur).order_by(Collecteur.nom).all()
+        ],
+        "zones": [
+            {"id": str(z.id), "nom": z.libelle}
+            for z in db.query(ZoneCollecte).order_by(ZoneCollecte.libelle).all()
+        ],
+        "produits": [
+            {"id": str(p.id), "nom": p.designation}
+            for p in db.query(Produit).order_by(Produit.designation).all()
+        ],
+        "magasins": [
+            {"id": str(m.id), "nom": m.nom}
+            for m in db.query(Magasin).order_by(Magasin.nom).all()
+        ],
+    }
+
+
+@router.get("/referentiels/collectes", include_in_schema=False)
+def liste_collectes(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Collectes recentes, pour les listes deroulantes."""
+    from app.models import Collecteur
+
+    lignes = (
+        db.query(Collecte, Collecteur.nom)
+        .join(Collecteur, Collecteur.id == Collecte.collecteur_id)
+        .order_by(Collecte.numero.desc())
+        .limit(50)
+        .all()
+    )
+    return [
+        {
+            "id": str(c.id),
+            "numero": c.numero,
+            "collecteur": nom,
+            "statut": c.statut.value,
+        }
+        for c, nom in lignes
+    ]
+
+
+@router.get("/{collecte_id}", response_model=CollecteLire,
+            dependencies=[Depends(exiger_permission("collecte.collecte.lire"))])
+def lire_collecte(
+    collecte_id: UUID,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    collecte = db.get(Collecte, collecte_id)
+    if collecte is None:
+        raise HTTPException(status_code=404, detail="Collecte introuvable")
+    return collecte

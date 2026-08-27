@@ -45,3 +45,32 @@ def utilisateur_courant(
         )
 
     return utilisateur
+
+
+def exiger_permission(code_permission: str):
+    """
+    Verifie que l'utilisateur detient une permission avant d'executer la route.
+
+    Usage : dependencies=[Depends(exiger_permission("collecte.avance.creer"))]
+
+    Le superadmin passe toujours. C'est volontaire : sans cela, une erreur de
+    parametrage des roles vous enfermerait dehors de votre propre systeme.
+    """
+
+    def verificateur(
+        utilisateur: Utilisateur = Depends(utilisateur_courant),
+    ) -> Utilisateur:
+        if getattr(utilisateur, "is_superadmin", False):
+            return utilisateur
+
+        detenues = {
+            p.code for role in utilisateur.roles for p in role.permissions
+        }
+        if code_permission not in detenues:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Vous n'avez pas la permission d'effectuer cette action",
+            )
+        return utilisateur
+
+    return verificateur

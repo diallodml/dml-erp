@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_db, utilisateur_courant
+from app.core.deps import exiger_permission, get_db, utilisateur_courant
 from app.models import Collecte, Utilisateur
 from app.repositories import collecte as repo
 from app.schemas.collecte import (
@@ -28,7 +28,8 @@ router = APIRouter(prefix="/api/v1/collecte", tags=["Collecte & Consignation"])
 # ---------------------------------------------------------------------------
 # AVANCES
 # ---------------------------------------------------------------------------
-@router.post("/avances", response_model=AvanceLire, status_code=201)
+@router.post("/avances", response_model=AvanceLire, status_code=201,
+             dependencies=[Depends(exiger_permission("collecte.avance.creer"))])
 def creer_avance(
     donnees: AvanceCreer,
     db: Session = Depends(get_db),
@@ -41,7 +42,8 @@ def creer_avance(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/avances/soldes", response_model=List[SoldeCollecteur])
+@router.get("/avances/soldes", response_model=List[SoldeCollecteur],
+            dependencies=[Depends(exiger_permission("collecte.avance.lire"))])
 def soldes(
     db: Session = Depends(get_db),
     utilisateur: Utilisateur = Depends(utilisateur_courant),
@@ -53,7 +55,8 @@ def soldes(
 # ---------------------------------------------------------------------------
 # COLLECTES
 # ---------------------------------------------------------------------------
-@router.post("", response_model=CollecteLire, status_code=201)
+@router.post("", response_model=CollecteLire, status_code=201,
+             dependencies=[Depends(exiger_permission("collecte.collecte.creer"))])
 def creer_collecte(
     donnees: CollecteCreer,
     db: Session = Depends(get_db),
@@ -66,7 +69,8 @@ def creer_collecte(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{collecte_id}/lignes", response_model=LigneCollecteLire, status_code=201)
+@router.post("/{collecte_id}/lignes", response_model=LigneCollecteLire, status_code=201,
+             dependencies=[Depends(exiger_permission("collecte.ligne.creer"))])
 def ajouter_ligne(
     collecte_id: UUID,
     donnees: LigneCollecteCreer,
@@ -80,7 +84,8 @@ def ajouter_ligne(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{collecte_id}/reception", response_model=CollecteLire)
+@router.post("/{collecte_id}/reception", response_model=CollecteLire,
+             dependencies=[Depends(exiger_permission("collecte.reception.creer"))])
 def receptionner(
     collecte_id: UUID,
     donnees: CollecteReceptionner,
@@ -94,7 +99,8 @@ def receptionner(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{collecte_id}", response_model=CollecteLire)
+@router.get("/{collecte_id}", response_model=CollecteLire,
+            dependencies=[Depends(exiger_permission("collecte.collecte.lire"))])
 def lire_collecte(
     collecte_id: UUID,
     db: Session = Depends(get_db),
@@ -109,7 +115,8 @@ def lire_collecte(
 # ---------------------------------------------------------------------------
 # TABLEAU DE BORD
 # ---------------------------------------------------------------------------
-@router.get("/tableau/ecarts", response_model=List[EcartCollecteur])
+@router.get("/tableau/ecarts", response_model=List[EcartCollecteur],
+            dependencies=[Depends(exiger_permission("collecte.ecart.lire"))])
 def ecarts(
     depuis: Optional[date] = Query(default=None),
     db: Session = Depends(get_db),
@@ -119,7 +126,8 @@ def ecarts(
     return repo.ecarts_collecteurs(db, depuis)
 
 
-@router.post("/{collecte_id}/entree-stock", status_code=201)
+@router.post("/{collecte_id}/entree-stock", status_code=201,
+             dependencies=[Depends(exiger_permission("collecte.stock.creer"))])
 def entree_stock(
     collecte_id: UUID,
     db: Session = Depends(get_db),
@@ -143,7 +151,8 @@ def entree_stock(
     }
 
 
-@router.get("/tableau/stock")
+@router.get("/tableau/stock",
+            dependencies=[Depends(exiger_permission("collecte.stock.lire"))])
 def tableau_stock(
     magasin_id: Optional[UUID] = Query(default=None),
     db: Session = Depends(get_db),

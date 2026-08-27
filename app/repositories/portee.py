@@ -28,12 +28,15 @@ def portee_utilisateur(utilisateur: Utilisateur, code_permission: str) -> Portee
         PorteeDonnees.GLOBAL: 4,
     }
 
+    if getattr(utilisateur, "is_superadmin", False):
+        return PorteeDonnees.GLOBAL
+
     for role in utilisateur.roles:
-        for permission in role.permissions:
-            if permission.code != code_permission:
-                continue
-            if plus_large is None or ordre[permission.portee] > ordre[plus_large]:
-                plus_large = permission.portee
+        if not any(p.code == code_permission for p in role.permissions):
+            continue
+        portee = role.portee_par_defaut
+        if plus_large is None or ordre[portee] > ordre[plus_large]:
+            plus_large = portee
 
     return plus_large or PorteeDonnees.PROPRE
 

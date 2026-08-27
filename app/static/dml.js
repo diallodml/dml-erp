@@ -40,6 +40,8 @@ const DML = {
     if (DML.peut("collecte.ecart.lire") || DML.peut("collecte.stock.lire"))
       liens.push(["/tableau", "Tableau de bord"]);
     liens.push(["/saisie", "Saisie"]);
+    if (DML.peut("referentiel.collecteur.creer"))
+      liens.push(["/referentiel", "Collecteurs"]);
 
     const nav = liens.map(([href, texte]) =>
       `<a href="${href}"${href === pageCourante ? ' aria-current="page"' : ""}>${texte}</a>`

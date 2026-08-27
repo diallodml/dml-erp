@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collecteurs et marchés — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Collecteurs et marchés</h1>
+    <p>Ajoutez vos collecteurs et les marchés où ils achètent. Un collecteur ne peut recevoir d'avance qu'une fois son plafond fixé par la direction.</p>
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" data-vue="collecteurs" aria-selected="true">Collecteurs</button>
+    <button role="tab" data-vue="marches" aria-selected="false">Marchés</button>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <section id="vue-collecteurs">
+    <fieldset>
+      <legend>Ajouter un collecteur</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="c_code">Code
+            <span class="aide">court et unique, ex. COL-AMADOU</span>
+          </label>
+          <input id="c_code" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="c_nom">Nom complet</label>
+          <input id="c_nom" type="text" maxlength="180">
+        </div>
+        <div>
+          <label for="c_tel">Téléphone</label>
+          <input id="c_tel" type="tel" placeholder="+237...">
+        </div>
+        <div>
+          <label for="c_momo">Numéro Mobile Money
+            <span class="aide">si différent</span>
+          </label>
+          <input id="c_momo" type="tel">
+        </div>
+        <div>
+          <label for="c_piece">Pièce d'identité
+            <span class="aide">numéro CNI ou passeport</span>
+          </label>
+          <input id="c_piece" type="text" maxlength="60">
+        </div>
+        <div>
+          <label for="c_type">Type</label>
+          <select id="c_type">
+            <option value="INDEPENDANT">Indépendant</option>
+            <option value="SALARIE">Salarié DML</option>
+            <option value="COOPERATIVE">Coopérative</option>
+            <option value="GROSSISTE_MARCHE">Grossiste de marché</option>
+          </select>
+        </div>
+        <div>
+          <label for="c_zone">Marché habituel</label>
+          <select id="c_zone"></select>
+        </div>
+        <div>
+          <label for="c_marge">Marge convenue par tonne
+            <span class="aide">en FCFA</span>
+          </label>
+          <input id="c_marge" type="number" min="0" step="500" value="15000">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerCollecteur()">Ajouter le collecteur</button>
+      </div>
+    </fieldset>
+
+    <h2>Collecteurs enregistrés</h2>
+    <div id="table-collecteurs"></div>
+  </section>
+
+  <section id="vue-marches" hidden>
+    <fieldset>
+      <legend>Ajouter un marché</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="z_code">Code
+            <span class="aide">ex. ZC-GUIDER</span>
+          </label>
+          <input id="z_code" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="z_libelle">Nom du marché</label>
+          <input id="z_libelle" type="text" maxlength="150">
+        </div>
+        <div>
+          <label for="z_village">Village</label>
+          <input id="z_village" type="text" maxlength="120">
+        </div>
+        <div>
+          <label for="z_dept">Département</label>
+          <input id="z_dept" type="text" maxlength="120">
+        </div>
+        <div>
+          <label for="z_region">Région</label>
+          <input id="z_region" type="text" maxlength="120">
+        </div>
+        <div>
+          <label for="z_jour">Jour de marché
+            <span class="aide">ex. Samedi</span>
+          </label>
+          <input id="z_jour" type="text" maxlength="60">
+        </div>
+        <div>
+          <label for="z_km">Distance depuis Douala
+            <span class="aide">en km</span>
+          </label>
+          <input id="z_km" type="number" min="0" step="10">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerZone()">Ajouter le marché</button>
+      </div>
+    </fieldset>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/referentiel");
+
+const PEUT_PLAFOND = DML.peut("referentiel.plafond.modifier");
+
+document.querySelectorAll('[role="tab"]').forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
+    b.setAttribute("aria-selected", "true");
+    ["collecteurs", "marches"].forEach(v =>
+      document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
+    DML.cacherMessage("msg");
+  });
+});
+
+async function charger() {
+  try {
+    const refs = await DML.api("/api/v1/collecte/referentiels");
+    const sel = document.getElementById("c_zone");
+    sel.innerHTML = '<option value="">— aucun —</option>' +
+      refs.zones.map(z => `<option value="${z.id}">${z.nom}</option>`).join("");
+  } catch (e) { /* silencieux */ }
+  listerCollecteurs();
+}
+
+async function listerCollecteurs() {
+  try {
+    const liste = await DML.api("/api/v1/referentiel/collecteurs");
+    if (!liste.length) {
+      document.getElementById("table-collecteurs").innerHTML =
+        '<div class="vide">Aucun collecteur. Ajoutez-en un ci-dessus.</div>';
+      return;
+    }
+    document.getElementById("table-collecteurs").innerHTML = `
+      <div class="enveloppe-table"><table>
+        <thead><tr>
+          <th>Code</th><th>Nom</th><th>Téléphone</th>
+          <th>Plafond d'avance</th><th>Collectes</th><th>Écart cumulé</th>
+          ${PEUT_PLAFOND ? "<th></th>" : ""}
+        </tr></thead>
+        <tbody>${liste.map(c => {
+          const bloque = Number(c.plafond_avance) <= 0;
+          return `<tr>
+            <td>${c.code}</td>
+            <td>${c.nom}</td>
+            <td>${c.telephone || "—"}</td>
+            <td class="num ${bloque ? "negatif" : ""}">
+              ${bloque ? "Non fixé" : DML.fcfa(c.plafond_avance)}
+            </td>
+            <td class="num">${c.nb_collectes}</td>
+            <td class="num ${Number(c.ecart_cumule_kg) < 0 ? "negatif" : ""}">
+              ${DML.kg(c.ecart_cumule_kg)}
+            </td>
+            ${PEUT_PLAFOND ? `<td><button class="bouton secondaire"
+               style="padding:5px 12px;font-size:13px"
+               onclick="fixerPlafond('${c.id}','${c.nom.replace(/'/g, "\\'")}',${c.plafond_avance})">
+               Plafond</button></td>` : ""}
+          </tr>`;
+        }).join("")}</tbody>
+      </table></div>`;
+  } catch (e) {
+    document.getElementById("table-collecteurs").innerHTML =
+      `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function creerCollecteur() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("c_code").value.trim();
+  const nom = document.getElementById("c_nom").value.trim();
+  if (!code || !nom) {
+    DML.message("msg", "Le code et le nom sont obligatoires.", "erreur");
+    return;
+  }
+  try {
+    const r = await DML.api("/api/v1/referentiel/collecteurs", {
+      method: "POST",
+      body: JSON.stringify({
+        code, nom,
+        telephone: document.getElementById("c_tel").value.trim() || null,
+        telephone_mobile_money: document.getElementById("c_momo").value.trim() || null,
+        piece_identite: document.getElementById("c_piece").value.trim() || null,
+        type_collecteur: document.getElementById("c_type").value,
+        zone_principale_id: document.getElementById("c_zone").value || null,
+        marge_fixe_tonne: Number(document.getElementById("c_marge").value) || null,
+      }),
+    });
+    DML.message("msg", `${r.nom} ajouté. ${r.message}`, "ok");
+    ["c_code", "c_nom", "c_tel", "c_momo", "c_piece"].forEach(
+      id => document.getElementById(id).value = "");
+    listerCollecteurs();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function fixerPlafond(id, nom, actuel) {
+  const saisi = prompt(`Plafond d'avance pour ${nom}, en FCFA :`, actuel || "");
+  if (saisi === null) return;
+  try {
+    const r = await DML.api(`/api/v1/referentiel/collecteurs/${id}/plafond`, {
+      method: "PATCH",
+      body: JSON.stringify({ plafond_avance: Number(saisi) }),
+    });
+    DML.message("msg", `Plafond de ${r.nom} fixé à ${DML.fcfa(r.plafond_avance)}.`, "ok");
+    listerCollecteurs();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function creerZone() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("z_code").value.trim();
+  const libelle = document.getElementById("z_libelle").value.trim();
+  if (!code || !libelle) {
+    DML.message("msg", "Le code et le nom du marché sont obligatoires.", "erreur");
+    return;
+  }
+  try {
+    const r = await DML.api("/api/v1/referentiel/zones", {
+      method: "POST",
+      body: JSON.stringify({
+        code, libelle,
+        village: document.getElementById("z_village").value.trim() || null,
+        departement: document.getElementById("z_dept").value.trim() || null,
+        region: document.getElementById("z_region").value.trim() || null,
+        jour_marche: document.getElementById("z_jour").value.trim() || null,
+        distance_douala_km: Number(document.getElementById("z_km").value) || null,
+      }),
+    });
+    DML.message("msg", `Marché ${r.libelle} ajouté.`, "ok");
+    ["z_code", "z_libelle", "z_village", "z_dept", "z_region", "z_jour", "z_km"]
+      .forEach(id => document.getElementById(id).value = "");
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+charger();
+</script>
+</body>
+</html>

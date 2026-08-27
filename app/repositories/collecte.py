@@ -316,3 +316,134 @@ def ecarts_collecteurs(
             }
         )
     return resultats
+
+
+# ---------------------------------------------------------------------------
+# ENTREE EN STOCK
+# ---------------------------------------------------------------------------
+def entrer_en_stock(
+    db: Session, collecte: Collecte, utilisateur: Utilisateur
+):
+    """
+    Cree le lot et le mouvement d'entree a partir d'une collecte receptionnee.
+
+    Le lot porte le MODE DE DETENTION : c'est ce qui permet de dire, dans un
+    magasin ou tout est melange, ce qui appartient a DML et ce qui est detenu
+    pour un collecteur.
+
+    Le cout unitaire est le cout de revient REEL : (achat + frais annexes)
+    divise par le poids EFFECTIVEMENT recu -- pas le poids paye. Valoriser
+    sur le poids theorique surevaluerait le stock des kilos qui n'existent pas.
+    """
+    from app.models import Lot, MouvementStock
+    from app.models.enums import SensMouvement, TypeMouvementStock, UniteMesure
+
+    if collecte.statut != StatutCollecte.RECEPTIONNEE:
+        raise ValueError("La collecte doit etre receptionnee")
+    if collecte.poids_reel_kg is None or collecte.poids_reel_kg <= 0:
+        raise ValueError("Poids reel absent : impossible d'entrer en stock")
+
+    existant = db.query(Lot).filter(Lot.collecte_id == collecte.id).first()
+    if existant is not None:
+        raise ValueError(f"Stock deja cree pour cette collecte (lot {existant.numero})")
+
+    lignes = (
+        db.query(LigneCollecte)
+        .filter(LigneCollecte.collecte_id == collecte.id)
+        .all()
+    )
+    if not lignes:
+        raise ValueError("Aucune ligne d'achat : rien a entrer en stock")
+
+    produits = {l.produit_id for l in lignes}
+    if len(produits) > 1:
+        raise ValueError(
+            "Collecte multi-produits : creation de lot par produit non geree"
+        )
+    produit_id = lignes[0].produit_id
+
+    cout_total = collecte.montant_achat_total + collecte.frais_annexes
+    cout_unitaire = (cout_total / collecte.poids_reel_kg).quantize(Decimal("0.01"))
+
+    lot = Lot(
+        numero=prochain_numero(db, Lot, "LOT"),
+        produit_id=produit_id,
+        magasin_id=collecte.magasin_destination_id,
+        collecte_id=collecte.id,
+        collecteur_id=collecte.collecteur_id,
+        mode_detention=collecte.mode_detention,
+        quantite_initiale=collecte.poids_reel_kg,
+        quantite_disponible=collecte.poids_reel_kg,
+        quantite_reservee=Decimal("0"),
+        nombre_sacs=collecte.nombre_sacs_recus,
+        unite=UniteMesure.KG,
+        cout_unitaire=cout_unitaire,
+        valeur_stock=cout_total,
+        taux_humidite_entree=collecte.taux_humidite_magasin,
+        taux_impuretes_entree=collecte.taux_impuretes_magasin,
+        campagne_agricole=collecte.campagne_agricole,
+    )
+    db.add(lot)
+    db.flush()
+
+    mouvement = MouvementStock(
+        numero=prochain_numero(db, MouvementStock, "MVT"),
+        type_mouvement=TypeMouvementStock.ENTREE_ACHAT,
+        sens=SensMouvement.ENTREE,
+        date_mouvement=collecte.date_reception_magasin,
+        produit_id=produit_id,
+        lot_id=lot.id,
+        magasin_destination_id=collecte.magasin_destination_id,
+        quantite=collecte.poids_reel_kg,
+        unite=UniteMesure.KG,
+        cout_unitaire=cout_unitaire,
+        created_by_id=utilisateur.id,
+    )
+    db.add(mouvement)
+    db.commit()
+    db.refresh(lot)
+    return lot
+
+
+def etat_stock(db: Session, magasin_id: Optional[UUID] = None) -> List[dict]:
+    """
+    Combien de tonnes en magasin, et a qui appartiennent-elles ?
+
+    Le decoupage par mode de detention est la reponse a : "je detiens
+    40 tonnes, dont 25 a moi et 15 pour Amadou".
+    """
+    from app.models import Lot, Magasin, Produit
+
+    q = (
+        db.query(
+            Magasin.nom.label("magasin"),
+            Produit.designation.label("produit"),
+            Lot.mode_detention,
+            func.count(Lot.id).label("nb_lots"),
+            func.coalesce(func.sum(Lot.quantite_disponible), 0).label("quantite"),
+            func.coalesce(func.sum(Lot.valeur_stock), 0).label("valeur"),
+        )
+        .join(Magasin, Magasin.id == Lot.magasin_id)
+        .join(Produit, Produit.id == Lot.produit_id)
+        .filter(Lot.quantite_disponible > 0)
+    )
+    if magasin_id:
+        q = q.filter(Lot.magasin_id == magasin_id)
+
+    lignes = (
+        q.group_by(Magasin.nom, Produit.designation, Lot.mode_detention)
+        .order_by(Magasin.nom, Produit.designation)
+        .all()
+    )
+    return [
+        {
+            "magasin": l.magasin,
+            "produit": l.produit,
+            "mode_detention": l.mode_detention,
+            "nb_lots": l.nb_lots,
+            "quantite_kg": Decimal(l.quantite),
+            "tonnes": (Decimal(l.quantite) / 1000).quantize(Decimal("0.001")),
+            "valeur": Decimal(l.valeur),
+        }
+        for l in lignes
+    ]

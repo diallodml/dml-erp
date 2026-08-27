@@ -117,3 +117,37 @@ def ecarts(
 ):
     """Qui achete bien, qui coute de l'argent. Trie du pire au meilleur."""
     return repo.ecarts_collecteurs(db, depuis)
+
+
+@router.post("/{collecte_id}/entree-stock", status_code=201)
+def entree_stock(
+    collecte_id: UUID,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Cree le lot et le mouvement d'entree depuis une collecte receptionnee."""
+    collecte = db.get(Collecte, collecte_id)
+    if collecte is None:
+        raise HTTPException(status_code=404, detail="Collecte introuvable")
+    try:
+        lot = repo.entrer_en_stock(db, collecte, utilisateur)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "lot_id": str(lot.id),
+        "numero": lot.numero,
+        "quantite_kg": lot.quantite_disponible,
+        "cout_unitaire": lot.cout_unitaire,
+        "valeur_stock": lot.valeur_stock,
+        "mode_detention": lot.mode_detention,
+    }
+
+
+@router.get("/tableau/stock")
+def tableau_stock(
+    magasin_id: Optional[UUID] = Query(default=None),
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Combien de tonnes en magasin, et a qui appartiennent-elles ?"""
+    return repo.etat_stock(db, magasin_id)

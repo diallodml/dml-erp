@@ -50,7 +50,6 @@ from .base import (
     ReferentielModel,
 )
 from .enums import (
-    ModeDetention,
     CausePerte,
     Devise,
     MethodeValorisation,
@@ -305,18 +304,6 @@ class Lot(ReferentielModel):
     )
     lot_parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("lots.id", ondelete="SET NULL"), comment="Issu d'un reconditionnement"
-    )
-
-    # --- Origine collecte village & statut juridique de la marchandise
-    collecte_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("collectes.id", ondelete="SET NULL"), index=True
-    )
-    collecteur_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("collecteurs.id", ondelete="SET NULL"), index=True
-    )
-    mode_detention: Mapped[ModeDetention] = mapped_column(
-        EnumCol(ModeDetention), default=ModeDetention.PROPRIETE, nullable=False, index=True,
-        comment="Ce lot appartient-il a DML ou est-il detenu pour un tiers ?"
     )
 
     # --- Quantites

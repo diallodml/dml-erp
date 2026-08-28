@@ -153,6 +153,9 @@ from .collecte import (
     ZoneCollecte,
 )
 
+# --- Module 9 : Traitement chez prestataire
+from .traitement import Prestataire, Traitement
+
 __all__ = [
     # Socle
     "Base", "BaseModel", "DocumentModel", "ReferentielModel",
@@ -192,4 +195,6 @@ __all__ = [
     # Collecte & consignation
     "ZoneCollecte", "Collecteur", "ContratConsignation", "AvanceCollecteur",
     "Collecte", "LigneCollecte", "ReversementCollecteur",
+    # Traitement prestataire
+    "Prestataire", "Traitement",
 ]

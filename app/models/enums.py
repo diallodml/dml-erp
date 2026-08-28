@@ -842,3 +842,33 @@ class StatutReversement(str, Enum):
     PAYE = "PAYE"
     COMPENSE_AVANCE = "COMPENSE_AVANCE"
     BLOQUE_LITIGE = "BLOQUE_LITIGE"
+
+
+# ===========================================================================
+# MODULE 9 : TRAITEMENT CHEZ PRESTATAIRE (sechage, triage, fumigation)
+# ===========================================================================
+class TypeTraitement(str, Enum):
+    SECHAGE = "SECHAGE"
+    TRIAGE = "TRIAGE"
+    NETTOYAGE = "NETTOYAGE"
+    FUMIGATION = "FUMIGATION"
+    CALIBRAGE = "CALIBRAGE"
+    CONDITIONNEMENT = "CONDITIONNEMENT"
+    MIXTE = "MIXTE"
+
+
+class StatutTraitement(str, Enum):
+    PLANIFIE = "PLANIFIE"
+    EXPEDIE = "EXPEDIE"          # parti chez le prestataire
+    EN_COURS = "EN_COURS"
+    TERMINE = "TERMINE"
+    LIVRE_CLIENT = "LIVRE_CLIENT"
+    ANNULE = "ANNULE"
+    LITIGE = "LITIGE"
+
+
+class BaseFacturationTraitement(str, Enum):
+    """Sur quel tonnage le prestataire facture."""
+    TONNE_ENTREE = "TONNE_ENTREE"
+    TONNE_SORTIE = "TONNE_SORTIE"
+    FORFAIT_LOT = "FORFAIT_LOT"

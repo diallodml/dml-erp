@@ -48,6 +48,8 @@ const DML = {
       liens.push(["/vente", "Livraisons"]);
     if (DML.peut("referentiel.collecteur.creer"))
       liens.push(["/referentiel", "Collecteurs"]);
+    if (DML.peut("referentiel.collecteur.lire"))
+      liens.push(["/collecteur", "Fiches"]);
 
     const nav = liens.map(([href, texte]) =>
       `<a href="${href}"${href === pageCourante ? ' aria-current="page"' : ""}>${texte}</a>`

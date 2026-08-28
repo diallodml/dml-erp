@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fiche collecteur — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+<style>
+  .identite{
+    background:var(--encre);color:var(--sisal-2);
+    padding:18px 20px;margin-bottom:1px;
+  }
+  .identite h2{font-family:var(--display);font-size:22px;margin:0 0 4px}
+  .identite .meta{
+    font-family:var(--data);font-size:12px;color:var(--trait);
+    display:flex;flex-wrap:wrap;gap:4px 18px;
+  }
+  .choix{margin-bottom:20px;max-width:420px}
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Fiche collecteur</h1>
+    <p>À consulter avant de remettre une nouvelle avance. Un écart qui se répète n'est pas un accident.</p>
+  </div>
+
+  <div class="choix">
+    <label for="sel">Collecteur</label>
+    <select id="sel" onchange="charger()"></select>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+  <div id="contenu"></div>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/collecteur");
+
+async function init() {
+  try {
+    const liste = await DML.api("/api/v1/referentiel/collecteurs");
+    document.getElementById("sel").innerHTML = liste.length
+      ? liste.map(c => `<option value="${c.id}">${c.nom}</option>`).join("")
+      : '<option value="">Aucun collecteur</option>';
+    if (liste.length) charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function charger() {
+  const id = document.getElementById("sel").value;
+  if (!id) return;
+  DML.cacherMessage("msg");
+  try {
+    const d = await DML.api(`/api/v1/referentiel/collecteurs/${id}/historique`);
+    afficher(d);
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function table(entetes, lignes, vide) {
+  if (!lignes.length) return `<div class="vide">${vide}</div>`;
+  return `<div class="enveloppe-table"><table>
+    <thead><tr>${entetes.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+    <tbody>${lignes.join("")}</tbody></table></div>`;
+}
+
+function afficher(d) {
+  const c = d.collecteur, s = d.synthese;
+  const ecart = Number(s.ecart_kg) || 0;
+  const theo = Number(s.poids_theorique_kg) || 0;
+  const reel = Number(s.poids_reel_kg) || 0;
+  const part = theo ? Math.max(0, Math.min(100, (reel / theo) * 100)) : 0;
+  const bloque = Number(c.plafond_avance) <= 0;
+
+  document.getElementById("contenu").innerHTML = `
+    <div class="identite">
+      <h2>${c.nom}</h2>
+      <div class="meta">
+        <span>${c.code}</span>
+        <span>${c.telephone || "sans téléphone"}</span>
+        <span>${c.statut}</span>
+        <span>${c.nb_collectes} collecte(s) · ${DML.tonnes(c.tonnage_cumule)}</span>
+      </div>
+    </div>
+
+    ${theo ? `
+    <section>
+      <div class="balance">
+        <div class="titre">Écart cumulé entre le poids payé et le poids reçu</div>
+        <div class="chiffre ${ecart < 0 ? "negatif" : "positif"}">
+          ${ecart > 0 ? "+" : ""}${DML.kg(ecart)}
+        </div>
+        <div class="sous">
+          ${s.ecart_pourcentage != null ? `Soit ${s.ecart_pourcentage} % du tonnage payé. ` : ""}
+          ${ecart < 0
+            ? "Ces kilos ont été payés au marché sans jamais arriver."
+            : "Le poids reçu dépasse le poids annoncé."}
+        </div>
+        <div class="fleau">
+          <div class="rail"><div class="paye"></div><div class="recu" style="width:${part}%"></div></div>
+          <div class="legende">
+            <span>Reçu ${DML.kg(reel)}</span><span>Payé ${DML.kg(theo)}</span>
+          </div>
+        </div>
+      </div>
+    </section>` : ""}
+
+    <section>
+      <div class="cartes">
+        <div class="carte">
+          <span class="etiquette">Avances non justifiées</span>
+          <div class="valeur ${Number(s.reste_du_avances) > 0 ? "alerte" : ""}">
+            ${DML.fcfa(s.reste_du_avances)}</div>
+        </div>
+        <div class="carte">
+          <span class="etiquette">Reste à lui reverser</span>
+          <div class="valeur">${DML.fcfa(s.solde_reversements)}</div>
+        </div>
+        <div class="carte">
+          <span class="etiquette">Plafond d'avance</span>
+          <div class="valeur ${bloque ? "alerte" : ""}">
+            ${bloque ? "Non fixé" : DML.fcfa(c.plafond_avance)}</div>
+          <div class="note">${bloque ? "aucune avance possible" : "marge convenue " + DML.fcfa(c.marge_fixe_tonne) + "/t"}</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Collectes</h2>
+      ${table(
+        ["Pièce", "Date", "Marché", "Statut", "Sacs", "Payé", "Reçu", "Écart", "Humidité", "Montant"],
+        d.collectes.map(x => `<tr>
+          <td>${x.numero}</td>
+          <td>${x.date || "—"}</td>
+          <td>${x.marche}</td>
+          <td>${x.statut}</td>
+          <td class="num">${x.sacs || 0}</td>
+          <td class="num">${DML.kg(x.poids_theorique_kg)}</td>
+          <td class="num">${x.poids_reel_kg != null ? DML.kg(x.poids_reel_kg) : "—"}</td>
+          <td class="num ${Number(x.ecart_kg) < 0 ? "negatif" : ""}">
+            ${x.ecart_kg != null ? DML.kg(x.ecart_kg) : "—"}</td>
+          <td class="num">${x.humidite != null ? x.humidite + " %" : "—"}</td>
+          <td class="num">${DML.fcfa(x.montant)}</td>
+        </tr>`),
+        "Aucune collecte enregistrée pour ce collecteur."
+      )}
+    </section>
+
+    <section>
+      <h2>Avances</h2>
+      ${table(
+        ["Pièce", "Date", "Remis", "Justifié", "Reste dû", "Statut"],
+        d.avances.map(x => `<tr>
+          <td>${x.numero}</td>
+          <td>${x.date || "—"}</td>
+          <td class="num">${DML.fcfa(x.remis)}</td>
+          <td class="num">${DML.fcfa(x.justifie)}</td>
+          <td class="num ${Number(x.reste_du) > 0 ? "negatif" : ""}">${DML.fcfa(x.reste_du)}</td>
+          <td>${x.statut}</td>
+        </tr>`),
+        "Aucune avance remise à ce collecteur."
+      )}
+    </section>
+
+    <section>
+      <h2>Reversements</h2>
+      ${table(
+        ["Pièce", "Date", "Tonnage", "Net dû", "Payé", "Statut"],
+        d.reversements.map(x => `<tr>
+          <td>${x.numero}</td>
+          <td>${x.date || "—"}</td>
+          <td class="num">${DML.tonnes(x.tonnage)}</td>
+          <td class="num">${DML.fcfa(x.net_du)}</td>
+          <td class="num">${DML.fcfa(x.paye)}</td>
+          <td>${x.statut}</td>
+        </tr>`),
+        "Aucun reversement calculé pour ce collecteur."
+      )}
+    </section>`;
+}
+
+init();
+</script>
+</body>
+</html>

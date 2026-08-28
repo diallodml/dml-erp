@@ -59,3 +59,8 @@ def page_traitement(request: Request):
 @app.get("/magasin", response_class=HTMLResponse, include_in_schema=False)
 def page_magasin(request: Request):
     return templates.TemplateResponse(request, "magasin.html")
+
+
+@app.get("/collecteur", response_class=HTMLResponse, include_in_schema=False)
+def page_collecteur(request: Request):
+    return templates.TemplateResponse(request, "collecteur.html")

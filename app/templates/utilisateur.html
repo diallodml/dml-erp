@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Utilisateurs — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+<style>
+  .puce{
+    display:inline-block;padding:2px 9px;font-family:var(--data);
+    font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;border:1px solid;
+  }
+  .puce.actif   {background:rgba(47,107,79,.14);border-color:var(--gain);color:var(--gain)}
+  .puce.inactif {background:rgba(168,50,45,.12);border-color:var(--perte);color:var(--perte)}
+  .roles-choix{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px}
+  .roles-choix label{
+    display:flex;align-items:flex-start;gap:7px;font-weight:400;
+    border:1px solid var(--trait);padding:9px 12px;background:var(--sisal-2);
+    cursor:pointer;flex:1;min-width:200px;margin:0;
+  }
+  .roles-choix input{width:auto;margin-top:2px}
+  .roles-choix b{display:block;font-weight:600;font-size:14px}
+  .roles-choix span{font-size:12px;color:var(--texte-doux)}
+  .actions-ligne{display:flex;gap:5px;flex-wrap:wrap}
+  .actions-ligne button{padding:4px 10px;font-size:12.5px}
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Utilisateurs</h1>
+    <p>Créez les comptes de vos collègues et attribuez-leur un rôle. Chacun ne verra que ce que son rôle autorise.</p>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <section>
+    <fieldset>
+      <legend>Créer un compte</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="u_login">Identifiant de connexion
+            <span class="aide">court, sans espace</span>
+          </label>
+          <input id="u_login" type="text" autocapitalize="none">
+        </div>
+        <div>
+          <label for="u_nom">Nom affiché</label>
+          <input id="u_nom" type="text">
+        </div>
+        <div>
+          <label for="u_mdp">Mot de passe provisoire
+            <span class="aide">8 caractères minimum</span>
+          </label>
+          <input id="u_mdp" type="text">
+        </div>
+        <div>
+          <label for="u_tel">Téléphone</label>
+          <input id="u_tel" type="tel">
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <label>Rôle</label>
+        <div class="roles-choix" id="roles"></div>
+      </div>
+
+      <div class="actions">
+        <button class="bouton" onclick="creer()">Créer le compte</button>
+        <span class="qui" style="color:var(--texte-doux)">
+          L'utilisateur devra changer son mot de passe à la première connexion.
+        </span>
+      </div>
+    </fieldset>
+  </section>
+
+  <section>
+    <h2>Comptes existants</h2>
+    <div id="table-users"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/utilisateurs");
+
+let ROLES = [];
+
+const DESCRIPTIONS = {
+  DIRECTION: "Voit tout, arbitre les dérogations, paie les collecteurs",
+  AGENT_SAISIE: "Saisit les avances, les collectes et les achats au marché",
+  MAGASINIER: "Réceptionne, pèse, gère le stock de son magasin",
+};
+
+async function charger() {
+  try {
+    ROLES = await DML.api("/api/v1/utilisateurs/roles");
+    document.getElementById("roles").innerHTML = ROLES.map(r => `
+      <label>
+        <input type="checkbox" value="${r.code}">
+        <span>
+          <b>${r.nom}</b>
+          <span>${DESCRIPTIONS[r.code] || r.portee} — ${r.nb_permissions} droits</span>
+        </span>
+      </label>`).join("");
+  } catch (e) { /* silencieux */ }
+  lister();
+}
+
+async function lister() {
+  try {
+    const liste = await DML.api("/api/v1/utilisateurs");
+    document.getElementById("table-users").innerHTML = `
+      <div class="enveloppe-table"><table>
+        <thead><tr>
+          <th>État</th><th>Identifiant</th><th>Nom</th><th>Rôles</th>
+          <th>Téléphone</th><th></th>
+        </tr></thead>
+        <tbody>${liste.map(u => `<tr>
+          <td><span class="puce ${u.is_actif ? "actif" : "inactif"}">
+            ${u.is_actif ? "Actif" : "Coupé"}</span></td>
+          <td>${u.login}</td>
+          <td>${u.nom_affichage}${u.is_superadmin ? " · direction" : ""}</td>
+          <td>${u.roles.join(", ") || (u.is_superadmin ? "tous droits" : "aucun")}</td>
+          <td>${u.telephone || "—"}</td>
+          <td><div class="actions-ligne">
+            <button class="bouton secondaire"
+              onclick="reinit('${u.id}','${u.login}')">Mot de passe</button>
+            ${u.is_superadmin ? "" : `<button class="bouton secondaire"
+              onclick="basculer('${u.id}','${u.login}')">${u.is_actif ? "Couper" : "Rouvrir"}</button>`}
+          </div></td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+  } catch (e) {
+    document.getElementById("table-users").innerHTML =
+      `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function creer() {
+  DML.cacherMessage("msg");
+  const login = document.getElementById("u_login").value.trim();
+  const nom = document.getElementById("u_nom").value.trim();
+  const mdp = document.getElementById("u_mdp").value;
+  const roles = [...document.querySelectorAll("#roles input:checked")].map(i => i.value);
+
+  if (!login || !nom || !mdp) {
+    DML.message("msg", "Identifiant, nom et mot de passe sont obligatoires.", "erreur");
+    return;
+  }
+  if (mdp.length < 8) {
+    DML.message("msg", "Le mot de passe doit faire 8 caractères au minimum.", "erreur");
+    return;
+  }
+  if (!roles.length) {
+    DML.message("msg", "Choisissez au moins un rôle, sinon ce compte ne verra rien.", "erreur");
+    return;
+  }
+
+  try {
+    const r = await DML.api("/api/v1/utilisateurs", {
+      method: "POST",
+      body: JSON.stringify({
+        login, nom_affichage: nom, mot_de_passe: mdp,
+        telephone: document.getElementById("u_tel").value.trim() || null,
+        roles,
+      }),
+    });
+    DML.message("msg",
+      `Compte ${r.login} créé. Communiquez-lui le mot de passe provisoire — ` +
+      `il devra le changer.`, "ok");
+    ["u_login", "u_nom", "u_mdp", "u_tel"].forEach(i => document.getElementById(i).value = "");
+    document.querySelectorAll("#roles input:checked").forEach(i => i.checked = false);
+    lister();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function reinit(id, login) {
+  const mdp = prompt(`Nouveau mot de passe provisoire pour ${login} :`);
+  if (!mdp) return;
+  if (mdp.length < 8) { alert("8 caractères minimum."); return; }
+  try {
+    await DML.api(`/api/v1/utilisateurs/${id}/mot-de-passe`, {
+      method: "PATCH",
+      body: JSON.stringify({ mot_de_passe: mdp }),
+    });
+    DML.message("msg", `Mot de passe de ${login} réinitialisé.`, "ok");
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function basculer(id, login) {
+  try {
+    const r = await DML.api(`/api/v1/utilisateurs/${id}/activation`, { method: "PATCH" });
+    DML.message("msg",
+      `Accès de ${login} ${r.is_actif ? "rouvert" : "coupé"}.`, "ok");
+    lister();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+charger();
+</script>
+</body>
+</html>

@@ -216,3 +216,81 @@ def lire_collecte(
     if collecte is None:
         raise HTTPException(status_code=404, detail="Collecte introuvable")
     return collecte
+
+
+@router.get("/tableau/lots",
+            dependencies=[Depends(exiger_permission("collecte.stock.lire"))])
+def lots_en_magasin(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """
+    Lots en stock, du plus a risque au plus sain.
+
+    Le risque combine deux facteurs : l'humidite d'entree au-dela du seuil
+    du produit, et l'age du lot. Du grain a 16 % entre hier n'est pas encore
+    un probleme ; le meme lot trois semaines plus tard en est un.
+    """
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from app.models import Collecteur, Lot, Magasin, Produit
+
+    lignes = (
+        db.query(Lot, Produit.designation, Produit.taux_humidite_max,
+                 Magasin.nom, Collecteur.nom)
+        .join(Produit, Produit.id == Lot.produit_id)
+        .join(Magasin, Magasin.id == Lot.magasin_id)
+        .outerjoin(Collecteur, Collecteur.id == Lot.collecteur_id)
+        .filter(Lot.quantite_disponible > 0)
+        .all()
+    )
+
+    maintenant = datetime.now(timezone.utc)
+    resultats = []
+
+    for lot, produit, seuil, magasin, collecteur in lignes:
+        age_jours = None
+        if lot.date_entree is not None:
+            entree = lot.date_entree
+            if hasattr(entree, "date"):
+                entree = entree.date()
+            age_jours = (maintenant.date() - entree).days
+
+        humidite = lot.taux_humidite_entree
+        seuil = seuil or Decimal("14.00")
+        hors_seuil = humidite is not None and humidite > seuil
+
+        # Le risque monte avec l'humidite ET avec le temps
+        if hors_seuil and age_jours is not None and age_jours > 21:
+            risque = "URGENCE"
+        elif hors_seuil and age_jours is not None and age_jours > 7:
+            risque = "CRITIQUE"
+        elif hors_seuil:
+            risque = "ATTENTION"
+        elif age_jours is not None and age_jours > 90:
+            risque = "ATTENTION"
+        else:
+            risque = "INFO"
+
+        resultats.append({
+            "id": str(lot.id),
+            "numero": lot.numero,
+            "produit": produit,
+            "magasin": magasin,
+            "collecteur": collecteur,
+            "mode_detention": lot.mode_detention.value if lot.mode_detention else None,
+            "quantite_kg": lot.quantite_disponible,
+            "tonnes": (lot.quantite_disponible / Decimal("1000")).quantize(Decimal("0.001")),
+            "humidite": humidite,
+            "seuil": seuil,
+            "hors_seuil": hors_seuil,
+            "age_jours": age_jours,
+            "cout_unitaire": lot.cout_unitaire,
+            "valeur": lot.valeur_stock,
+            "risque": risque,
+        })
+
+    ordre = {"URGENCE": 0, "CRITIQUE": 1, "ATTENTION": 2, "INFO": 3}
+    resultats.sort(key=lambda r: (ordre[r["risque"]], -(r["age_jours"] or 0)))
+    return resultats

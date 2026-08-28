@@ -40,6 +40,8 @@ const DML = {
     if (DML.peut("collecte.ecart.lire") || DML.peut("collecte.stock.lire"))
       liens.push(["/tableau", "Tableau de bord"]);
     liens.push(["/saisie", "Saisie"]);
+    if (DML.peut("collecte.stock.lire"))
+      liens.push(["/magasin", "Magasin"]);
     if (DML.peut("traitement.expedier"))
       liens.push(["/traitement", "Traitement"]);
     if (DML.peut("vente.livraison.creer"))

@@ -54,3 +54,8 @@ def page_vente(request: Request):
 @app.get("/traitement", response_class=HTMLResponse, include_in_schema=False)
 def page_traitement(request: Request):
     return templates.TemplateResponse(request, "traitement.html")
+
+
+@app.get("/magasin", response_class=HTMLResponse, include_in_schema=False)
+def page_magasin(request: Request):
+    return templates.TemplateResponse(request, "magasin.html")

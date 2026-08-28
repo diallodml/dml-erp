@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magasin — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+<style>
+  .puce{
+    display:inline-block;padding:2px 9px;font-family:var(--data);
+    font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+    border:1px solid;white-space:nowrap;
+  }
+  .puce.urgence  {background:var(--perte);border-color:var(--perte);color:#fff}
+  .puce.critique {background:rgba(168,50,45,.16);border-color:var(--perte);color:var(--perte)}
+  .puce.attention{background:rgba(232,163,23,.22);border-color:#B07B0C;color:#7A5507}
+  .puce.info     {background:none;border-color:var(--trait);color:var(--texte-doux)}
+  .filtres{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .filtres button{
+    background:var(--sisal-2);border:1px solid var(--trait);color:var(--texte-doux);
+    padding:7px 14px;font-family:var(--corps);font-size:13.5px;cursor:pointer;
+  }
+  .filtres button[aria-pressed="true"]{
+    background:var(--encre);border-color:var(--encre);color:var(--sisal-2);font-weight:600;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Magasin</h1>
+    <p>Ce qui dort en stock. Un lot entré trop humide devient un problème avec le temps — les plus urgents sont en haut.</p>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <section id="bloc-alerte"></section>
+
+  <section>
+    <h2>Lots en stock</h2>
+    <div class="filtres">
+      <button data-filtre="tous" aria-pressed="true">Tous</button>
+      <button data-filtre="risque" aria-pressed="false">À surveiller</button>
+      <button data-filtre="humide" aria-pressed="false">Hors seuil</button>
+    </div>
+    <div id="table-lots"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/magasin");
+
+let LOTS = [], FILTRE = "tous";
+
+const MODES = {
+  PROPRIETE: "À DML",
+  MARGE_FIXE_TONNE: "Marge fixe",
+  CONSIGNATION_POURCENTAGE: "En dépôt",
+};
+
+document.querySelectorAll(".filtres button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".filtres button")
+      .forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+    FILTRE = b.dataset.filtre;
+    afficher();
+  });
+});
+
+async function charger() {
+  try {
+    LOTS = await DML.api("/api/v1/collecte/tableau/lots");
+    resume();
+    afficher();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function resume() {
+  const aRisque = LOTS.filter(l => l.risque === "URGENCE" || l.risque === "CRITIQUE");
+  const tonnes = LOTS.reduce((s, l) => s + Number(l.tonnes), 0);
+  const valeur = LOTS.reduce((s, l) => s + Number(l.valeur || 0), 0);
+  const tonnesRisque = aRisque.reduce((s, l) => s + Number(l.tonnes), 0);
+
+  document.getElementById("bloc-alerte").innerHTML = aRisque.length
+    ? `<div class="balance">
+         <div class="titre">Marchandise à traiter sans attendre</div>
+         <div class="chiffre negatif">${DML.tonnes(tonnesRisque)}</div>
+         <div class="sous">
+           ${aRisque.length} lot${aRisque.length > 1 ? "s" : ""} entré${aRisque.length > 1 ? "s" : ""}
+           au-dessus du seuil d'humidité et stocké${aRisque.length > 1 ? "s" : ""} depuis plus d'une semaine.
+           Ce grain chauffe.
+         </div>
+         <div class="cartes" style="margin-top:16px">
+           <div class="carte"><span class="etiquette">Total en magasin</span>
+             <div class="valeur">${DML.tonnes(tonnes)}</div></div>
+           <div class="carte"><span class="etiquette">Valeur du stock</span>
+             <div class="valeur">${DML.fcfa(valeur)}</div></div>
+           <div class="carte"><span class="etiquette">Lots au total</span>
+             <div class="valeur">${LOTS.length}</div></div>
+         </div>
+       </div>`
+    : `<div class="cartes">
+         <div class="carte"><span class="etiquette">Total en magasin</span>
+           <div class="valeur">${DML.tonnes(tonnes)}</div></div>
+         <div class="carte"><span class="etiquette">Valeur du stock</span>
+           <div class="valeur">${DML.fcfa(valeur)}</div></div>
+         <div class="carte"><span class="etiquette">Lots</span>
+           <div class="valeur">${LOTS.length}</div>
+           <div class="note">rien à signaler</div></div>
+       </div>`;
+}
+
+function afficher() {
+  let liste = LOTS;
+  if (FILTRE === "risque")
+    liste = LOTS.filter(l => l.risque === "URGENCE" || l.risque === "CRITIQUE");
+  if (FILTRE === "humide")
+    liste = LOTS.filter(l => l.hors_seuil);
+
+  if (!liste.length) {
+    document.getElementById("table-lots").innerHTML =
+      `<div class="vide">${FILTRE === "tous"
+        ? "Aucun lot en stock. Réceptionnez une collecte pour commencer."
+        : "Aucun lot dans cette catégorie."}</div>`;
+    return;
+  }
+
+  document.getElementById("table-lots").innerHTML = `
+    <div class="enveloppe-table"><table>
+      <thead><tr>
+        <th>État</th><th>Lot</th><th>Produit</th><th>Magasin</th>
+        <th>Détention</th><th>Quantité</th><th>Humidité</th>
+        <th>Âge</th><th>Coût/kg</th><th>Valeur</th>
+      </tr></thead>
+      <tbody>${liste.map(l => `<tr>
+        <td><span class="puce ${l.risque.toLowerCase()}">${etiquette(l)}</span></td>
+        <td>${l.numero}</td>
+        <td>${l.produit}</td>
+        <td>${l.magasin}</td>
+        <td>${MODES[l.mode_detention] || "—"}</td>
+        <td class="num">${DML.tonnes(l.tonnes)}</td>
+        <td class="num ${l.hors_seuil ? "negatif" : ""}">
+          ${l.humidite != null ? l.humidite + " %" : "—"}
+        </td>
+        <td class="num">${l.age_jours != null ? l.age_jours + " j" : "—"}</td>
+        <td class="num">${l.cout_unitaire} F</td>
+        <td class="num">${DML.fcfa(l.valeur)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+function etiquette(l) {
+  if (l.risque === "URGENCE")   return "Urgent";
+  if (l.risque === "CRITIQUE")  return "À traiter";
+  if (l.risque === "ATTENTION") return "Surveiller";
+  return "Sain";
+}
+
+charger();
+</script>
+</body>
+</html>

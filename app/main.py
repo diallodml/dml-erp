@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.api.v1 import auth, collecte, referentiel, vente
+from app.api.v1 import auth, collecte, referentiel, traitement, vente
 
 app = FastAPI(
     title="ERP DML SARL",
@@ -18,6 +18,7 @@ app.include_router(auth.router)
 app.include_router(collecte.router)
 app.include_router(referentiel.router)
 app.include_router(vente.router)
+app.include_router(traitement.router)
 
 
 @app.get("/health", tags=["Systeme"])
@@ -48,3 +49,8 @@ def page_referentiel(request: Request):
 @app.get("/vente", response_class=HTMLResponse, include_in_schema=False)
 def page_vente(request: Request):
     return templates.TemplateResponse(request, "vente.html")
+
+
+@app.get("/traitement", response_class=HTMLResponse, include_in_schema=False)
+def page_traitement(request: Request):
+    return templates.TemplateResponse(request, "traitement.html")

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traitement — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Traitement</h1>
+    <p>Envoyez un lot au séchage, puis pesez ce qui revient. L'écart entre la perte réelle et la perte que le séchage explique est ce qu'il faut surveiller.</p>
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" data-vue="expedier" aria-selected="true">Envoyer</button>
+    <button role="tab" data-vue="recevoir" aria-selected="false">Recevoir</button>
+    <button role="tab" data-vue="rendements" aria-selected="false">Rendements</button>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <!-- ENVOYER -->
+  <section id="vue-expedier">
+    <fieldset>
+      <legend>Envoyer un lot chez le prestataire</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="e_prestataire">Prestataire</label>
+          <select id="e_prestataire" onchange="majPrix()"></select>
+        </div>
+        <div>
+          <label for="e_lot">Lot à envoyer</label>
+          <select id="e_lot" onchange="majDispo()"></select>
+        </div>
+        <div>
+          <label for="e_date">Date d'expédition</label>
+          <input id="e_date" type="datetime-local">
+        </div>
+        <div>
+          <label for="e_poids">Poids envoyé
+            <span class="aide" id="dispo">en kg</span>
+          </label>
+          <input id="e_poids" type="number" min="1" step="1" oninput="majCout()">
+        </div>
+        <div>
+          <label for="e_humidite">Humidité au départ
+            <span class="aide">en %, mesurée</span>
+          </label>
+          <input id="e_humidite" type="number" min="0" max="100" step="0.1">
+        </div>
+        <div>
+          <label for="e_type">Type de traitement</label>
+          <select id="e_type">
+            <option value="SECHAGE">Séchage</option>
+            <option value="TRIAGE">Triage</option>
+            <option value="NETTOYAGE">Nettoyage</option>
+            <option value="FUMIGATION">Fumigation</option>
+            <option value="MIXTE">Plusieurs</option>
+          </select>
+        </div>
+        <div>
+          <label for="e_prix">Prix à la tonne
+            <span class="aide">en FCFA</span>
+          </label>
+          <input id="e_prix" type="number" min="0" step="500" oninput="majCout()">
+        </div>
+        <div>
+          <label for="e_transport">Frais de transport
+            <span class="aide">aller, en FCFA</span>
+          </label>
+          <input id="e_transport" type="number" min="0" step="1000" value="0">
+        </div>
+      </div>
+
+      <div id="apercu" class="message ok" hidden></div>
+
+      <div class="actions">
+        <button class="bouton" onclick="expedier()">Enregistrer l'expédition</button>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- RECEVOIR -->
+  <section id="vue-recevoir" hidden>
+    <fieldset>
+      <legend>Peser au retour</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="r_traitement">Traitement en cours</label>
+          <select id="r_traitement"></select>
+        </div>
+        <div>
+          <label for="r_date">Date de retour</label>
+          <input id="r_date" type="datetime-local">
+        </div>
+        <div>
+          <label for="r_poids">Poids pesé au retour
+            <span class="aide">en kg</span>
+          </label>
+          <input id="r_poids" type="number" min="1" step="1">
+        </div>
+        <div>
+          <label for="r_humidite">Humidité au retour
+            <span class="aide">en %</span>
+          </label>
+          <input id="r_humidite" type="number" min="0" max="100" step="0.1">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="receptionner()">Enregistrer la pesée</button>
+      </div>
+    </fieldset>
+
+    <div id="resultat"></div>
+  </section>
+
+  <!-- RENDEMENTS -->
+  <section id="vue-rendements" hidden>
+    <h2>Rendement par prestataire</h2>
+    <div id="table-rendements"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/traitement");
+
+let PRESTAS = [], LOTS = [];
+
+document.querySelectorAll('[role="tab"]').forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
+    b.setAttribute("aria-selected", "true");
+    ["expedier", "recevoir", "rendements"].forEach(v =>
+      document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
+    DML.cacherMessage("msg");
+    if (b.dataset.vue === "recevoir") chargerEnCours();
+    if (b.dataset.vue === "rendements") chargerRendements();
+  });
+});
+
+async function charger() {
+  const maintenant = new Date().toISOString().slice(0, 16);
+  document.getElementById("e_date").value = maintenant;
+  document.getElementById("r_date").value = maintenant;
+
+  try {
+    PRESTAS = await DML.api("/api/v1/traitement/prestataires");
+    document.getElementById("e_prestataire").innerHTML = PRESTAS.length
+      ? PRESTAS.map(p => `<option value="${p.id}">${p.nom}${p.a_magasin ? "" : " (magasin manquant)"}</option>`).join("")
+      : '<option value="">Aucun prestataire enregistré</option>';
+    majPrix();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+
+  try {
+    LOTS = await DML.api("/api/v1/vente/lots");
+    document.getElementById("e_lot").innerHTML = LOTS.length
+      ? LOTS.map(l => `<option value="${l.id}">${l.nom}</option>`).join("")
+      : '<option value="">Aucun lot en stock</option>';
+    majDispo();
+  } catch (e) { /* silencieux */ }
+}
+
+function prestaChoisi() {
+  return PRESTAS.find(p => p.id === document.getElementById("e_prestataire").value);
+}
+function lotChoisi() {
+  return LOTS.find(l => l.id === document.getElementById("e_lot").value);
+}
+
+function majPrix() {
+  const p = prestaChoisi();
+  if (p && p.prix_tonne) document.getElementById("e_prix").value = p.prix_tonne;
+  majCout();
+}
+
+function majDispo() {
+  const lot = lotChoisi();
+  const el = document.getElementById("dispo");
+  if (!lot) { el.textContent = "en kg"; return; }
+  el.textContent = `en kg — ${DML.kg(lot.disponible_kg)} disponibles`;
+  document.getElementById("e_poids").max = lot.disponible_kg;
+  majCout();
+}
+
+function majCout() {
+  const poids = Number(document.getElementById("e_poids").value) || 0;
+  const prix = Number(document.getElementById("e_prix").value) || 0;
+  const el = document.getElementById("apercu");
+  if (!poids || !prix) { el.hidden = true; return; }
+  const cout = (poids / 1000) * prix;
+  el.hidden = false;
+  el.className = "message ok";
+  el.innerHTML = `Coût du traitement : <strong>${DML.fcfa(cout)}</strong>
+    pour ${(poids / 1000).toFixed(3)} tonne(s).`;
+}
+
+async function expedier() {
+  DML.cacherMessage("msg");
+  const presta = prestaChoisi(), lot = lotChoisi();
+  if (!presta || !lot) { DML.message("msg", "Choisissez un prestataire et un lot.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/traitement/expeditions", {
+      method: "POST",
+      body: JSON.stringify({
+        prestataire_id: presta.id,
+        lot_source_id: lot.id,
+        date_expedition: document.getElementById("e_date").value + ":00Z",
+        poids_entree_kg: Number(document.getElementById("e_poids").value),
+        type_traitement: document.getElementById("e_type").value,
+        humidite_entree: Number(document.getElementById("e_humidite").value) || null,
+        prix_tonne_applique: Number(document.getElementById("e_prix").value) || null,
+        frais_transport: Number(document.getElementById("e_transport").value) || 0,
+      }),
+    });
+    DML.message("msg", `${r.numero} — ${DML.kg(r.poids_entree_kg)} partis chez ${presta.nom}.`, "ok");
+    document.getElementById("e_poids").value = "";
+    document.getElementById("apercu").hidden = true;
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function chargerEnCours() {
+  try {
+    const liste = await DML.api("/api/v1/traitement/en-cours");
+    document.getElementById("r_traitement").innerHTML = liste.length
+      ? liste.map(t => `<option value="${t.id}">${t.nom}</option>`).join("")
+      : '<option value="">Aucun traitement en cours</option>';
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function receptionner() {
+  DML.cacherMessage("msg");
+  const id = document.getElementById("r_traitement").value;
+  if (!id) { DML.message("msg", "Choisissez un traitement.", "erreur"); return; }
+  try {
+    const r = await DML.api(`/api/v1/traitement/${id}/reception`, {
+      method: "POST",
+      body: JSON.stringify({
+        date_fin: document.getElementById("r_date").value + ":00Z",
+        poids_sortie_kg: Number(document.getElementById("r_poids").value),
+        humidite_sortie: Number(document.getElementById("r_humidite").value) || null,
+      }),
+    });
+    afficherResultat(r);
+    chargerEnCours();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function afficherResultat(r) {
+  const inexp = Number(r.perte_inexpliquee_kg) || 0;
+  const entree = Number(r.poids_entree_kg) || 1;
+  const sortie = Number(r.poids_sortie_kg) || 0;
+  const part = Math.max(0, Math.min(100, (sortie / entree) * 100));
+
+  document.getElementById("resultat").innerHTML = `
+    <div class="balance">
+      <div class="titre">Perte que le séchage n'explique pas</div>
+      <div class="chiffre ${inexp > 0 ? "negatif" : "positif"}">${DML.kg(inexp)}</div>
+      <div class="sous">
+        Perte totale ${DML.kg(r.perte_reelle_kg)}, dont
+        <strong>${DML.kg(r.perte_theorique_kg)}</strong> expliqués par la déshydratation.
+        ${inexp > 0 ? "Le reste est resté sur place." : "Rien d'anormal."}
+      </div>
+      <div class="fleau">
+        <div class="rail"><div class="paye"></div><div class="recu" style="width:${part}%"></div></div>
+        <div class="legende">
+          <span>Sorti ${DML.kg(sortie)}</span>
+          <span>Entré ${DML.kg(entree)}</span>
+        </div>
+      </div>
+      <div class="cartes" style="margin-top:16px">
+        <div class="carte"><span class="etiquette">Rendement</span>
+          <div class="valeur">${r.rendement_pct} %</div></div>
+        <div class="carte"><span class="etiquette">Coût du traitement</span>
+          <div class="valeur">${DML.fcfa(r.cout_traitement)}</div></div>
+        <div class="carte"><span class="etiquette">Coût au kilo</span>
+          <div class="valeur">${r.cout_unitaire_apres} F</div>
+          <div class="note">contre ${r.cout_unitaire_avant} F avant — lot ${r.lot_traite}</div></div>
+      </div>
+    </div>`;
+}
+
+async function chargerRendements() {
+  try {
+    const liste = await DML.api("/api/v1/traitement/tableau/rendements");
+    if (!liste.length) {
+      document.getElementById("table-rendements").innerHTML =
+        `<div class="vide">Aucun traitement termine pour le moment.</div>`;
+      return;
+    }
+    document.getElementById("table-rendements").innerHTML = `
+      <div class="enveloppe-table"><table>
+        <thead><tr>
+          <th>Prestataire</th><th>Lots</th><th>Entré</th><th>Sorti</th>
+          <th>Perte normale</th><th>Perte inexpliquée</th><th>Rendement</th>
+        </tr></thead>
+        <tbody>${liste.map(r => `<tr>
+          <td>${r.nom}</td>
+          <td class="num">${r.nb_traitements}</td>
+          <td class="num">${DML.kg(r.poids_entree_kg)}</td>
+          <td class="num">${DML.kg(r.poids_sortie_kg)}</td>
+          <td class="num">${DML.kg(r.perte_theorique_kg)}</td>
+          <td class="num ${Number(r.perte_inexpliquee_kg) > 0 ? "negatif" : ""}">${DML.kg(r.perte_inexpliquee_kg)}</td>
+          <td class="num">${r.rendement_pct ?? "—"} %</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+  } catch (e) {
+    document.getElementById("table-rendements").innerHTML =
+      `<div class="vide">${e.message}</div>`;
+  }
+}
+
+charger();
+</script>
+</body>
+</html>

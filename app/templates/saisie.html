@@ -203,6 +203,11 @@
     </fieldset>
 
     <div id="resultat"></div>
+    <div id="zone-stock" hidden>
+      <div class="actions">
+        <button class="bouton" onclick="entrerEnStock()">Entrer la marchandise en stock</button>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -348,6 +353,8 @@ async function receptionner() {
       }),
     });
     afficherEcart(r);
+    window.DERNIERE_COLLECTE = id;
+    document.getElementById("zone-stock").hidden = false;
     rafraichirCollectes();
   } catch (e) { DML.message("msg", e.message, "erreur"); }
 }
@@ -382,6 +389,19 @@ function afficherEcart(c) {
         </div>
       </div>
     </div>`;
+}
+
+async function entrerEnStock() {
+  DML.cacherMessage("msg");
+  const id = window.DERNIERE_COLLECTE;
+  if (!id) { DML.message("msg", "Receptionnez d'abord une collecte.", "erreur"); return; }
+  try {
+    const r = await DML.api(`/api/v1/collecte/${id}/entree-stock`, { method: "POST" });
+    DML.message("msg",
+      `Lot ${r.numero} cree — ${DML.kg(r.quantite_kg)} en magasin, ` +
+      `cout de revient ${r.cout_unitaire} F/kg.`, "ok");
+    document.getElementById("zone-stock").hidden = true;
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
 }
 
 charger();

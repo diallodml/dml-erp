@@ -243,3 +243,218 @@ def historique_collecteur(
             for r in reversements
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# PRODUITS
+# ---------------------------------------------------------------------------
+class ProduitCreer(BaseModel):
+    code: str = Field(max_length=40)
+    designation: str = Field(max_length=200)
+    famille_code: Optional[str] = Field(default=None, max_length=30)
+    poids_sac_kg: Optional[Decimal] = Field(default=None, gt=0)
+    taux_humidite_max: Optional[Decimal] = Field(default=None, ge=0, le=100)
+    taux_impuretes_max: Optional[Decimal] = Field(default=None, ge=0, le=100)
+    variete: Optional[str] = Field(default=None, max_length=120)
+
+
+@router.post("/produits", status_code=201,
+             dependencies=[Depends(exiger_permission("referentiel.produit.creer"))])
+def creer_produit(
+    donnees: ProduitCreer,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """
+    Cree un produit. Le seuil d'humidite pilote le controle qualite :
+    laissez-le vide pour un article qui ne s'en soucie pas (emballages,
+    consommables).
+    """
+    from app.models import FamilleProduit, Produit
+    from app.models.enums import UniteMesure
+
+    if db.query(Produit).filter(Produit.code == donnees.code).first():
+        raise HTTPException(status_code=400, detail=f"Le code {donnees.code} existe deja")
+
+    famille_id = None
+    if donnees.famille_code:
+        f = db.query(FamilleProduit).filter(
+            FamilleProduit.code == donnees.famille_code
+        ).first()
+        if f is None:
+            f = FamilleProduit(code=donnees.famille_code, nom=donnees.famille_code.title())
+            db.add(f)
+            db.flush()
+        famille_id = f.id
+
+    p = Produit(
+        code=donnees.code,
+        designation=donnees.designation,
+        famille_id=famille_id,
+        variete=donnees.variete,
+        unite_base=UniteMesure.KG,
+        poids_sac_kg=donnees.poids_sac_kg or Decimal("100"),
+        taux_humidite_max=donnees.taux_humidite_max,
+        taux_impuretes_max=donnees.taux_impuretes_max,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return {"id": str(p.id), "code": p.code, "designation": p.designation}
+
+
+@router.get("/produits",
+            dependencies=[Depends(exiger_permission("referentiel.produit.lire"))])
+def lister_produits(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    from app.models import FamilleProduit, Produit
+
+    lignes = (
+        db.query(Produit, FamilleProduit.nom)
+        .outerjoin(FamilleProduit, FamilleProduit.id == Produit.famille_id)
+        .order_by(Produit.designation)
+        .all()
+    )
+    return [
+        {
+            "id": str(p.id),
+            "code": p.code,
+            "designation": p.designation,
+            "famille": fam or "—",
+            "poids_sac_kg": p.poids_sac_kg,
+            "taux_humidite_max": p.taux_humidite_max,
+            "taux_impuretes_max": p.taux_impuretes_max,
+        }
+        for p, fam in lignes
+    ]
+
+
+# ---------------------------------------------------------------------------
+# MAGASINS
+# ---------------------------------------------------------------------------
+class MagasinCreer(BaseModel):
+    code: str = Field(max_length=30)
+    nom: str = Field(max_length=150)
+    type_magasin: str = "PRINCIPAL"
+    ville: str = Field(default="Douala", max_length=80)
+    quartier: Optional[str] = Field(default=None, max_length=120)
+    region: Optional[str] = Field(default=None, max_length=80)
+
+
+@router.post("/magasins", status_code=201,
+             dependencies=[Depends(exiger_permission("referentiel.magasin.creer"))])
+def creer_magasin(
+    donnees: MagasinCreer,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    from app.models import Magasin
+    from app.models.enums import TypeMagasin
+
+    if db.query(Magasin).filter(Magasin.code == donnees.code).first():
+        raise HTTPException(status_code=400, detail=f"Le code {donnees.code} existe deja")
+
+    try:
+        type_mag = TypeMagasin(donnees.type_magasin)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Type de magasin inconnu")
+
+    m = Magasin(
+        code=donnees.code,
+        nom=donnees.nom,
+        type_magasin=type_mag,
+        ville=donnees.ville,
+        quartier=donnees.quartier,
+        region=donnees.region,
+    )
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return {"id": str(m.id), "code": m.code, "nom": m.nom}
+
+
+@router.get("/magasins",
+            dependencies=[Depends(exiger_permission("referentiel.magasin.creer"))])
+def lister_magasins(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    from app.models import Magasin
+
+    return [
+        {
+            "id": str(m.id),
+            "code": m.code,
+            "nom": m.nom,
+            "type": m.type_magasin.value,
+            "ville": m.ville,
+        }
+        for m in db.query(Magasin).order_by(Magasin.nom).all()
+    ]
+
+
+# ---------------------------------------------------------------------------
+# PRESTATAIRES
+# ---------------------------------------------------------------------------
+class PrestataireCreer(BaseModel):
+    code: str = Field(max_length=30)
+    nom: str = Field(max_length=180)
+    telephone: Optional[str] = Field(default=None, max_length=40)
+    ville: str = Field(default="Douala", max_length=80)
+    prix_tonne: Optional[Decimal] = Field(default=None, ge=0)
+    base_facturation: str = "TONNE_ENTREE"
+    delai_habituel_jours: Optional[int] = Field(default=None, ge=0)
+
+
+@router.post("/prestataires", status_code=201,
+             dependencies=[Depends(exiger_permission("referentiel.prestataire.creer"))])
+def creer_prestataire(
+    donnees: PrestataireCreer,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """
+    Cree un prestataire ET son magasin virtuel.
+
+    Sans magasin associe, impossible de savoir ou se trouve la marchandise
+    pendant le traitement : on le cree donc automatiquement.
+    """
+    from app.models import Magasin, Prestataire
+    from app.models.enums import BaseFacturationTraitement, TypeMagasin
+
+    if db.query(Prestataire).filter(Prestataire.code == donnees.code).first():
+        raise HTTPException(status_code=400, detail=f"Le code {donnees.code} existe deja")
+
+    code_mag = f"MAG-{donnees.code}"[:30]
+    mag = db.query(Magasin).filter(Magasin.code == code_mag).first()
+    if mag is None:
+        mag = Magasin(
+            code=code_mag,
+            nom=f"Chez {donnees.nom}",
+            type_magasin=TypeMagasin.SOUS_TRAITE,
+            ville=donnees.ville,
+        )
+        db.add(mag)
+        db.flush()
+
+    try:
+        base = BaseFacturationTraitement(donnees.base_facturation)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Base de facturation inconnue")
+
+    p = Prestataire(
+        code=donnees.code,
+        nom=donnees.nom,
+        telephone=donnees.telephone,
+        ville=donnees.ville,
+        magasin_id=mag.id,
+        prix_tonne=donnees.prix_tonne,
+        base_facturation=base,
+        delai_habituel_jours=donnees.delai_habituel_jours,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return {"id": str(p.id), "code": p.code, "nom": p.nom, "magasin": mag.nom}

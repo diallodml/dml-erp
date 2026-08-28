@@ -19,6 +19,9 @@
   <div class="onglets" role="tablist">
     <button role="tab" data-vue="collecteurs" aria-selected="true">Collecteurs</button>
     <button role="tab" data-vue="marches" aria-selected="false">Marchés</button>
+    <button role="tab" data-vue="produits" aria-selected="false">Produits</button>
+    <button role="tab" data-vue="magasins" aria-selected="false">Magasins</button>
+    <button role="tab" data-vue="prestataires" aria-selected="false">Prestataires</button>
   </div>
 
   <div id="msg" class="message" hidden></div>
@@ -126,6 +129,148 @@
       </div>
     </fieldset>
   </section>
+
+  <section id="vue-produits" hidden>
+    <fieldset>
+      <legend>Ajouter un produit</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="p_code">Code
+            <span class="aide">ex. MAIS, SESAME</span>
+          </label>
+          <input id="p_code" type="text" maxlength="40">
+        </div>
+        <div>
+          <label for="p_designation">Désignation</label>
+          <input id="p_designation" type="text" maxlength="200">
+        </div>
+        <div>
+          <label for="p_famille">Famille
+            <span class="aide">ex. CEREALES, OLEAGINEUX</span>
+          </label>
+          <input id="p_famille" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="p_variete">Variété</label>
+          <input id="p_variete" type="text" maxlength="120">
+        </div>
+        <div>
+          <label for="p_sac">Poids d'un sac
+            <span class="aide">en kg, valeur habituelle</span>
+          </label>
+          <input id="p_sac" type="number" min="1" step="1" value="100">
+        </div>
+        <div>
+          <label for="p_humidite">Seuil d'humidité
+            <span class="aide">en %, vide si non concerné</span>
+          </label>
+          <input id="p_humidite" type="number" min="0" max="100" step="0.5" value="14">
+        </div>
+        <div>
+          <label for="p_impuretes">Seuil d'impuretés
+            <span class="aide">en %</span>
+          </label>
+          <input id="p_impuretes" type="number" min="0" max="100" step="0.5" value="2">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerProduit()">Ajouter le produit</button>
+      </div>
+    </fieldset>
+    <h2>Produits enregistrés</h2>
+    <div id="table-produits"></div>
+  </section>
+
+  <section id="vue-magasins" hidden>
+    <fieldset>
+      <legend>Ajouter un magasin</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="m_code">Code
+            <span class="aide">ex. MAG-B</span>
+          </label>
+          <input id="m_code" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="m_nom">Nom</label>
+          <input id="m_nom" type="text" maxlength="150">
+        </div>
+        <div>
+          <label for="m_type">Type</label>
+          <select id="m_type">
+            <option value="PRINCIPAL">Principal</option>
+            <option value="SECONDAIRE">Secondaire</option>
+            <option value="MAGASIN_BROUSSE">Point de collecte</option>
+            <option value="QUAI_TRANSIT">Quai de transit</option>
+            <option value="VIRTUEL">Virtuel</option>
+          </select>
+        </div>
+        <div>
+          <label for="m_ville">Ville</label>
+          <input id="m_ville" type="text" value="Douala" maxlength="80">
+        </div>
+        <div>
+          <label for="m_quartier">Quartier</label>
+          <input id="m_quartier" type="text" maxlength="120">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerMagasin()">Ajouter le magasin</button>
+      </div>
+    </fieldset>
+    <h2>Magasins enregistrés</h2>
+    <div id="table-magasins"></div>
+  </section>
+
+  <section id="vue-prestataires" hidden>
+    <fieldset>
+      <legend>Ajouter un prestataire</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="pr_code">Code</label>
+          <input id="pr_code" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="pr_nom">Nom de l'entreprise</label>
+          <input id="pr_nom" type="text" maxlength="180">
+        </div>
+        <div>
+          <label for="pr_tel">Téléphone</label>
+          <input id="pr_tel" type="tel" maxlength="40">
+        </div>
+        <div>
+          <label for="pr_ville">Ville</label>
+          <input id="pr_ville" type="text" value="Douala" maxlength="80">
+        </div>
+        <div>
+          <label for="pr_prix">Prix à la tonne
+            <span class="aide">en FCFA</span>
+          </label>
+          <input id="pr_prix" type="number" min="0" step="500">
+        </div>
+        <div>
+          <label for="pr_base">Facturation sur</label>
+          <select id="pr_base">
+            <option value="TONNE_ENTREE">Tonne entrée</option>
+            <option value="TONNE_SORTIE">Tonne sortie</option>
+            <option value="FORFAIT_LOT">Forfait par lot</option>
+          </select>
+        </div>
+        <div>
+          <label for="pr_delai">Délai habituel
+            <span class="aide">en jours</span>
+          </label>
+          <input id="pr_delai" type="number" min="0" step="1">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerPrestataire()">Ajouter le prestataire</button>
+        <span class="qui" style="color:var(--texte-doux)">
+          Son magasin de dépôt sera créé automatiquement.
+        </span>
+      </div>
+    </fieldset>
+  </section>
 </main>
 
 <script src="/static/dml.js"></script>
@@ -138,9 +283,11 @@ document.querySelectorAll('[role="tab"]').forEach(b => {
   b.addEventListener("click", () => {
     document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
     b.setAttribute("aria-selected", "true");
-    ["collecteurs", "marches"].forEach(v =>
+    ["collecteurs", "marches", "produits", "magasins", "prestataires"].forEach(v =>
       document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
     DML.cacherMessage("msg");
+    if (b.dataset.vue === "produits") listerProduits();
+    if (b.dataset.vue === "magasins") listerMagasins();
   });
 });
 
@@ -260,6 +407,107 @@ async function creerZone() {
     ["z_code", "z_libelle", "z_village", "z_dept", "z_region", "z_jour", "z_km"]
       .forEach(id => document.getElementById(id).value = "");
     charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+
+async function creerProduit() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("p_code").value.trim();
+  const des = document.getElementById("p_designation").value.trim();
+  if (!code || !des) { DML.message("msg", "Le code et la désignation sont obligatoires.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/referentiel/produits", {
+      method: "POST",
+      body: JSON.stringify({
+        code, designation: des,
+        famille_code: document.getElementById("p_famille").value.trim() || null,
+        variete: document.getElementById("p_variete").value.trim() || null,
+        poids_sac_kg: Number(document.getElementById("p_sac").value) || null,
+        taux_humidite_max: Number(document.getElementById("p_humidite").value) || null,
+        taux_impuretes_max: Number(document.getElementById("p_impuretes").value) || null,
+      }),
+    });
+    DML.message("msg", `Produit ${r.designation} ajouté.`, "ok");
+    ["p_code", "p_designation", "p_famille", "p_variete"].forEach(i => document.getElementById(i).value = "");
+    listerProduits();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function listerProduits() {
+  try {
+    const liste = await DML.api("/api/v1/referentiel/produits");
+    document.getElementById("table-produits").innerHTML = liste.length ? `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>Code</th><th>Désignation</th><th>Famille</th>
+          <th>Poids sac</th><th>Seuil humidité</th><th>Seuil impuretés</th></tr></thead>
+        <tbody>${liste.map(p => `<tr>
+          <td>${p.code}</td><td>${p.designation}</td><td>${p.famille}</td>
+          <td class="num">${p.poids_sac_kg || "—"} kg</td>
+          <td class="num">${p.taux_humidite_max != null ? p.taux_humidite_max + " %" : "—"}</td>
+          <td class="num">${p.taux_impuretes_max != null ? p.taux_impuretes_max + " %" : "—"}</td>
+        </tr>`).join("")}</tbody></table></div>`
+      : '<div class="vide">Aucun produit enregistré.</div>';
+  } catch (e) {
+    document.getElementById("table-produits").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function creerMagasin() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("m_code").value.trim();
+  const nom = document.getElementById("m_nom").value.trim();
+  if (!code || !nom) { DML.message("msg", "Le code et le nom sont obligatoires.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/referentiel/magasins", {
+      method: "POST",
+      body: JSON.stringify({
+        code, nom,
+        type_magasin: document.getElementById("m_type").value,
+        ville: document.getElementById("m_ville").value.trim() || "Douala",
+        quartier: document.getElementById("m_quartier").value.trim() || null,
+      }),
+    });
+    DML.message("msg", `Magasin ${r.nom} ajouté.`, "ok");
+    ["m_code", "m_nom", "m_quartier"].forEach(i => document.getElementById(i).value = "");
+    listerMagasins();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function listerMagasins() {
+  try {
+    const liste = await DML.api("/api/v1/referentiel/magasins");
+    document.getElementById("table-magasins").innerHTML = liste.length ? `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>Code</th><th>Nom</th><th>Type</th><th>Ville</th></tr></thead>
+        <tbody>${liste.map(m => `<tr>
+          <td>${m.code}</td><td>${m.nom}</td><td>${m.type}</td><td>${m.ville}</td>
+        </tr>`).join("")}</tbody></table></div>`
+      : '<div class="vide">Aucun magasin enregistré.</div>';
+  } catch (e) {
+    document.getElementById("table-magasins").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function creerPrestataire() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("pr_code").value.trim();
+  const nom = document.getElementById("pr_nom").value.trim();
+  if (!code || !nom) { DML.message("msg", "Le code et le nom sont obligatoires.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/referentiel/prestataires", {
+      method: "POST",
+      body: JSON.stringify({
+        code, nom,
+        telephone: document.getElementById("pr_tel").value.trim() || null,
+        ville: document.getElementById("pr_ville").value.trim() || "Douala",
+        prix_tonne: Number(document.getElementById("pr_prix").value) || null,
+        base_facturation: document.getElementById("pr_base").value,
+        delai_habituel_jours: Number(document.getElementById("pr_delai").value) || null,
+      }),
+    });
+    DML.message("msg", `${r.nom} ajouté, avec son magasin « ${r.magasin} ».`, "ok");
+    ["pr_code", "pr_nom", "pr_tel", "pr_prix", "pr_delai"].forEach(i => document.getElementById(i).value = "");
   } catch (e) { DML.message("msg", e.message, "erreur"); }
 }
 

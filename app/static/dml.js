@@ -23,13 +23,23 @@ const DML = {
     const corps = await reponse.json().catch(() => null);
     if (!reponse.ok) {
       const d = corps && corps.detail;
-      throw new Error(typeof d === "string" ? d : "La requete a echoue");
+      if (typeof d === "string") throw new Error(d);
+      if (Array.isArray(d)) {
+        throw new Error("Champ invalide — " +
+          d.map(e => (e.loc || []).slice(-1)[0] + " : " + e.msg).join(" | "));
+      }
+      throw new Error("La requete a echoue");
     }
     return corps;
   },
 
   exigerSession() {
     if (!DML.jeton()) { location.href = "/"; return false; }
+    const p = DML.profil();
+    if (p && p.doit_changer_mdp && !location.pathname.startsWith("/mot-de-passe")) {
+      location.href = "/mot-de-passe";
+      return false;
+    }
     return true;
   },
 

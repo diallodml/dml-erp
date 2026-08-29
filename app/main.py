@@ -100,3 +100,8 @@ def page_rentabilite(request: Request):
 @app.get("/audit", response_class=HTMLResponse, include_in_schema=False)
 def page_audit(request: Request):
     return templates.TemplateResponse(request, "audit.html")
+
+
+@app.get("/mot-de-passe", response_class=HTMLResponse, include_in_schema=False)
+def page_mot_de_passe(request: Request):
+    return templates.TemplateResponse(request, "mot_de_passe.html")

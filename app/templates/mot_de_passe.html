@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changer le mot de passe — ERP DML SARL</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css?v=4">
+</head>
+<body class="connexion">
+<div class="carte-connexion">
+  <div class="marque">Nouveau mot de passe</div>
+  <div class="sous-marque">Choisissez-en un que vous seul connaissez</div>
+
+  <div class="champ">
+    <label for="ancien">Mot de passe actuel</label>
+    <input id="ancien" type="password" autocomplete="current-password">
+  </div>
+
+  <div class="champ">
+    <label for="nouveau">Nouveau mot de passe
+      <span class="aide">8 caractères minimum</span>
+    </label>
+    <input id="nouveau" type="password" autocomplete="new-password">
+  </div>
+
+  <div class="champ">
+    <label for="confirme">Confirmer</label>
+    <input id="confirme" type="password" autocomplete="new-password">
+  </div>
+
+  <div id="msg" class="message erreur" hidden></div>
+
+  <button id="btn" class="bouton">Enregistrer</button>
+
+  <p class="pied">Celui qui vous a créé le compte connaît le mot de passe provisoire.</p>
+</div>
+
+<script src="/static/dml.js?v=4"></script>
+<script>
+if (!DML.jeton()) location.href = "/";
+
+const btn = document.getElementById("btn");
+
+async function changer() {
+  DML.cacherMessage("msg");
+  const ancien = document.getElementById("ancien").value;
+  const nouveau = document.getElementById("nouveau").value;
+  const confirme = document.getElementById("confirme").value;
+
+  if (!ancien || !nouveau) {
+    DML.message("msg", "Remplissez tous les champs.", "erreur"); return;
+  }
+  if (nouveau.length < 8) {
+    DML.message("msg", "8 caractères minimum.", "erreur"); return;
+  }
+  if (nouveau !== confirme) {
+    DML.message("msg", "Les deux saisies ne correspondent pas.", "erreur"); return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Enregistrement…";
+  try {
+    await DML.api("/api/v1/auth/changer-mot-de-passe", {
+      method: "POST",
+      body: JSON.stringify({ ancien, nouveau }),
+    });
+    const profil = await DML.api("/api/v1/auth/moi");
+    localStorage.setItem("dml_profil", JSON.stringify(profil));
+    location.href = "/saisie";
+  } catch (e) {
+    DML.message("msg", e.message, "erreur");
+    btn.disabled = false;
+    btn.textContent = "Enregistrer";
+  }
+}
+
+btn.addEventListener("click", changer);
+document.addEventListener("keydown", e => { if (e.key === "Enter") changer(); });
+</script>
+</body>
+</html>

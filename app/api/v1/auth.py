@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, utilisateur_courant
@@ -52,4 +53,39 @@ def moi(utilisateur: Utilisateur = Depends(utilisateur_courant)):
         "nom_affichage": utilisateur.nom_affichage,
         "is_superadmin": utilisateur.is_superadmin,
         "roles": [role.code for role in utilisateur.roles],
+        "permissions": sorted({
+            p.code for role in utilisateur.roles for p in role.permissions
+        }),
     }
+
+
+class ChangementMotDePasse(BaseModel):
+    ancien: str
+    nouveau: str = Field(min_length=8)
+
+
+@router.post("/changer-mot-de-passe")
+def changer_mot_de_passe(
+    donnees: ChangementMotDePasse,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """
+    L'utilisateur change son propre mot de passe.
+
+    Obligatoire a la premiere connexion : le mot de passe provisoire est
+    passe par la direction, il ne doit pas rester en service.
+    """
+    from app.core.security import hasher_mot_de_passe
+
+    if not verifier_mot_de_passe(donnees.ancien, utilisateur.mot_de_passe_hash):
+        raise HTTPException(status_code=400, detail="Ancien mot de passe incorrect")
+    if donnees.ancien == donnees.nouveau:
+        raise HTTPException(
+            status_code=400, detail="Le nouveau mot de passe doit etre different"
+        )
+
+    utilisateur.mot_de_passe_hash = hasher_mot_de_passe(donnees.nouveau)
+    utilisateur.doit_changer_mdp = False
+    db.commit()
+    return {"message": "Mot de passe change"}

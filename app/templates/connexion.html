@@ -64,7 +64,7 @@ async function connecter() {
     const profil = await DML.api("/api/v1/auth/moi");
     localStorage.setItem("dml_profil", JSON.stringify(profil));
 
-    location.href = "/saisie";
+    location.href = data.doit_changer_mdp ? "/mot-de-passe" : "/saisie";
   } catch (e) {
     DML.message("msg", e.message, "erreur");
     btn.disabled = false;

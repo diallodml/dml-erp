@@ -33,6 +33,42 @@ const DML = {
     return corps;
   },
 
+  // --- Deconnexion automatique apres inactivite
+  veille(minutes = 30) {
+    let dernier = Date.now();
+    let avertissement = null;
+    const limite = minutes * 60 * 1000;
+
+    const reveiller = () => {
+      dernier = Date.now();
+      if (avertissement) {
+        avertissement.remove();
+        avertissement = null;
+      }
+    };
+
+    ["click", "keydown", "scroll", "touchstart"].forEach(
+      e => document.addEventListener(e, reveiller, { passive: true })
+    );
+
+    setInterval(() => {
+      const inactif = Date.now() - dernier;
+      if (inactif >= limite) {
+        localStorage.setItem("dml_expire", "1");
+        DML.deconnecter();
+      } else if (inactif >= limite - 60000 && !avertissement) {
+        avertissement = document.createElement("div");
+        avertissement.style.cssText =
+          "position:fixed;bottom:20px;right:20px;background:#A8322D;color:#fff;" +
+          "padding:12px 18px;font-family:Inter,sans-serif;font-size:14px;z-index:99;" +
+          "max-width:300px;line-height:1.5";
+        avertissement.textContent =
+          "Vous allez être déconnecté dans une minute. Bougez la souris pour rester connecté.";
+        document.body.appendChild(avertissement);
+      }
+    }, 10000);
+  },
+
   exigerSession() {
     if (!DML.jeton()) { location.href = "/"; return false; }
     const p = DML.profil();
@@ -89,6 +125,7 @@ const DML = {
           <button class="deconnexion" onclick="DML.deconnecter()">Quitter</button>
         </span>
       </header>`);
+    DML.veille(30);
   },
 
   async telecharger(url, nom) {

@@ -36,6 +36,11 @@
 <script>
 const btn = document.getElementById("btn");
 
+if (localStorage.getItem("dml_expire")) {
+  localStorage.removeItem("dml_expire");
+  DML.message("msg", "Vous avez été déconnecté après 30 minutes sans activité.", "erreur");
+}
+
 async function connecter() {
   const login = document.getElementById("login").value.trim();
   const mdp = document.getElementById("mdp").value;

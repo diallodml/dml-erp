@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rentabilité — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css?v=4">
+<style>
+  .periode{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:22px}
+  .periode > div{min-width:120px}
+  .compte{border:1px solid var(--trait);background:var(--sisal-2);margin-bottom:24px}
+  .compte .l{display:flex;justify-content:space-between;padding:11px 16px;border-bottom:1px solid #DCE0D6;font-size:14px}
+  .compte .l:last-child{border-bottom:none}
+  .compte .l b{font-family:var(--data);font-variant-numeric:tabular-nums}
+  .compte .l.sous{background:var(--sisal);font-weight:600}
+  .compte .l.final{background:var(--encre);color:var(--sisal-2);font-size:15.5px;font-weight:600}
+  .compte .l.final b{font-size:19px}
+  .compte .l .negatif{color:var(--perte)}
+  .compte .l.final .negatif{color:#E8A317}
+  .barre-part{height:5px;background:var(--trait);margin-top:5px}
+  .barre-part div{height:100%;background:var(--mais)}
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Rentabilité</h1>
+    <p>Ce que l'activité rapporte réellement, une fois l'électricité, le carburant et les salaires déduits.</p>
+  </div>
+
+  <div class="periode">
+    <div>
+      <label for="annee">Année</label>
+      <select id="annee" onchange="charger()"></select>
+    </div>
+    <div>
+      <label for="mois">Mois</label>
+      <select id="mois" onchange="charger()">
+        <option value="">Année entière</option>
+        <option value="1">Janvier</option><option value="2">Février</option>
+        <option value="3">Mars</option><option value="4">Avril</option>
+        <option value="5">Mai</option><option value="6">Juin</option>
+        <option value="7">Juillet</option><option value="8">Août</option>
+        <option value="9">Septembre</option><option value="10">Octobre</option>
+        <option value="11">Novembre</option><option value="12">Décembre</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+  <div id="contenu"></div>
+</main>
+
+<script src="/static/dml.js?v=4"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/rentabilite");
+
+function init() {
+  const a = new Date().getFullYear();
+  document.getElementById("annee").innerHTML =
+    [a, a - 1, a - 2].map(x => `<option value="${x}">${x}</option>`).join("");
+  document.getElementById("mois").value = String(new Date().getMonth() + 1);
+  charger();
+}
+
+async function charger() {
+  DML.cacherMessage("msg");
+  const annee = document.getElementById("annee").value;
+  const mois = document.getElementById("mois").value;
+  try {
+    const d = await DML.api(`/api/v1/rentabilite?annee=${annee}${mois ? "&mois=" + mois : ""}`);
+    afficher(d);
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function afficher(d) {
+  const r = d.resultat, a = d.activite, k = d.au_kilo;
+  const net = Number(r.resultat_net);
+  const perte = Number(a.ecart_collecte_kg) + Number(a.perte_traitement_kg);
+
+  document.getElementById("contenu").innerHTML = `
+    <section>
+      <div class="balance">
+        <div class="titre">Résultat de la période — ${d.periode.libelle}</div>
+        <div class="chiffre ${net < 0 ? "negatif" : "positif"}">${DML.fcfa(net)}</div>
+        <div class="sous">
+          ${net < 0
+            ? "L'activité perd de l'argent sur cette période, une fois toutes les charges déduites."
+            : "Ce qui reste après la marchandise et toutes les charges générales."}
+          ${r.taux_resultat != null ? ` Soit ${r.taux_resultat} % du chiffre d'affaires.` : ""}
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Compte de résultat</h2>
+      <div class="compte">
+        <div class="l"><span>Chiffre d'affaires</span><b>${DML.fcfa(r.chiffre_affaires)}</b></div>
+        <div class="l"><span>Coût de la marchandise vendue</span><b>− ${DML.fcfa(r.cout_marchandise)}</b></div>
+        <div class="l sous"><span>Marge brute</span><b>${DML.fcfa(r.marge_brute)}${r.taux_marge != null ? ` &nbsp;(${r.taux_marge} %)` : ""}</b></div>
+        <div class="l"><span>Charges générales</span><b>− ${DML.fcfa(r.charges_generales)}</b></div>
+        <div class="l final"><span>Résultat net</span>
+          <b class="${net < 0 ? "negatif" : ""}">${DML.fcfa(net)}</b></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Au kilo</h2>
+      <div class="cartes">
+        <div class="carte">
+          <span class="etiquette">Marge par kilo</span>
+          <div class="valeur">${k.marge_par_kg != null ? k.marge_par_kg + " F" : "—"}</div>
+          <div class="note">avant charges générales</div>
+        </div>
+        <div class="carte">
+          <span class="etiquette">Charges par kilo</span>
+          <div class="valeur alerte">${k.charge_par_kg != null ? k.charge_par_kg + " F" : "—"}</div>
+          <div class="note">électricité, carburant, salaires…</div>
+        </div>
+        <div class="carte">
+          <span class="etiquette">Reste par kilo</span>
+          <div class="valeur ${k.resultat_par_kg != null && k.resultat_par_kg < 0 ? "alerte" : ""}">
+            ${k.resultat_par_kg != null ? k.resultat_par_kg + " F" : "—"}</div>
+          <div class="note">c'est votre vraie marge</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Activité de la période</h2>
+      <div class="cartes">
+        <div class="carte"><span class="etiquette">Collectes reçues</span>
+          <div class="valeur">${a.nb_collectes}</div>
+          <div class="note">${DML.tonnes(Number(a.kg_collectes) / 1000)} entrées</div></div>
+        <div class="carte"><span class="etiquette">Livraisons</span>
+          <div class="valeur">${a.nb_livraisons}</div>
+          <div class="note">${DML.tonnes(Number(a.kg_vendus) / 1000)} sorties</div></div>
+        <div class="carte"><span class="etiquette">Marchandise perdue</span>
+          <div class="valeur ${perte > 0 ? "alerte" : ""}">${DML.kg(perte)}</div>
+          <div class="note">écarts de collecte et de séchage</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Où part l'argent</h2>
+      ${d.charges.length ? `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>Poste</th><th>Montant</th><th>Part</th><th>Par kilo</th></tr></thead>
+        <tbody>${d.charges.map(c => `<tr>
+          <td>${c.libelle}
+            <div class="barre-part"><div style="width:${c.part}%"></div></div>
+          </td>
+          <td class="num">${DML.fcfa(c.montant)}</td>
+          <td class="num">${c.part} %</td>
+          <td class="num">${c.par_kg != null ? c.par_kg + " F" : "—"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`
+      : '<div class="vide">Aucune charge enregistrée sur cette période. Saisissez vos factures dans l\\u0027écran Caisse.</div>'}
+    </section>`;
+}
+
+init();
+</script>
+</body>
+</html>

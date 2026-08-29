@@ -185,6 +185,7 @@ function majDispo() {
   if (!lot) { el.textContent = "en kg"; return; }
   el.textContent = `en kg — ${DML.kg(lot.disponible_kg)} disponibles`;
   document.getElementById("e_poids").max = lot.disponible_kg;
+  if (lot.humidite != null) document.getElementById("e_humidite").value = lot.humidite;
   majCout();
 }
 

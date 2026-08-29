@@ -106,6 +106,7 @@ def lots_disponibles(
             "disponible_kg": lot.quantite_disponible,
             "cout_unitaire": lot.cout_unitaire,
             "magasin": magasin,
+            "humidite": lot.taux_humidite_entree,
         }
         for lot, produit, magasin, collecteur in lignes
     ]

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trésorerie — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css">
+<style>
+  .tiroirs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+  .tiroir-bloc{border:1px solid var(--trait)}
+  .tiroir-bloc > header{
+    background:var(--encre);color:var(--sisal-2);padding:11px 15px;
+  }
+  .tiroir-bloc > header b{font-family:var(--display);font-size:15px;display:block}
+  .tiroir-bloc > header span{font-family:var(--data);font-size:11px;color:var(--trait)}
+  .tiroir-bloc.associe > header{background:var(--tiroir,#5B4B8A)}
+  .compte{
+    background:var(--sisal-2);padding:11px 15px;border-top:1px solid var(--trait);
+    display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+  }
+  .compte .nom{font-size:14px}
+  .compte .nom small{display:block;font-family:var(--data);font-size:10.5px;color:var(--texte-doux);text-transform:uppercase;letter-spacing:.09em}
+  .compte .montant{font-family:var(--data);font-weight:600;font-size:16px;white-space:nowrap}
+  .compte .montant.zero{color:var(--perte)}
+  .total-tiroir{
+    background:var(--sisal);padding:11px 15px;border-top:1px solid var(--trait);
+    display:flex;justify-content:space-between;font-family:var(--data);font-weight:600;
+  }
+  .sens-entree{color:var(--gain)}
+  .sens-sortie{color:var(--perte)}
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Trésorerie</h1>
+    <p>Ce qui entre, ce qui sort, et dans quel tiroir. L'argent de l'entreprise et le vôtre restent séparés.</p>
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" data-vue="soldes" aria-selected="true">Soldes</button>
+    <button role="tab" data-vue="operation" aria-selected="false">Enregistrer</button>
+    <button role="tab" data-vue="journal" aria-selected="false">Journal</button>
+    <button role="tab" data-vue="depenses" aria-selected="false">Dépenses</button>
+    <button role="tab" data-vue="comptes" aria-selected="false">Comptes</button>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <!-- SOLDES -->
+  <section id="vue-soldes">
+    <div id="tiroirs" class="tiroirs"></div>
+  </section>
+
+  <!-- ENREGISTRER -->
+  <section id="vue-operation" hidden>
+    <fieldset>
+      <legend>Enregistrer une opération</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="o_sens">Nature</label>
+          <select id="o_sens" onchange="majFormulaire()">
+            <option value="DECAISSEMENT">Sortie — je paie</option>
+            <option value="ENCAISSEMENT">Entrée — j'encaisse</option>
+          </select>
+        </div>
+        <div>
+          <label for="o_compte">Compte</label>
+          <select id="o_compte" onchange="majSolde()"></select>
+        </div>
+        <div>
+          <label for="o_montant">Montant
+            <span class="aide" id="solde-info">en FCFA</span>
+          </label>
+          <input id="o_montant" type="number" min="1" step="500">
+        </div>
+        <div>
+          <label for="o_date">Date</label>
+          <input id="o_date" type="date">
+        </div>
+        <div id="bloc-categorie">
+          <label for="o_categorie">Poste de dépense</label>
+          <select id="o_categorie"></select>
+        </div>
+        <div>
+          <label for="o_mode">Mode de règlement</label>
+          <select id="o_mode">
+            <option value="ESPECES">Espèces</option>
+            <option value="MOBILE_MONEY">Mobile Money</option>
+            <option value="VIREMENT">Virement</option>
+            <option value="CHEQUE">Chèque</option>
+          </select>
+        </div>
+        <div>
+          <label for="o_beneficiaire">Bénéficiaire
+            <span class="aide">ENEO, CAMWATER, un nom…</span>
+          </label>
+          <input id="o_beneficiaire" type="text" maxlength="200">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="o_libelle">Motif</label>
+        <input id="o_libelle" type="text" maxlength="255" placeholder="Facture électricité août 2026">
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="enregistrer()">Enregistrer</button>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- JOURNAL -->
+  <section id="vue-journal" hidden>
+    <h2>Derniers mouvements</h2>
+    <div id="table-journal"></div>
+  </section>
+
+  <!-- DEPENSES -->
+  <section id="vue-depenses" hidden>
+    <h2>Dépenses par poste</h2>
+    <div id="table-depenses"></div>
+  </section>
+
+  <!-- COMPTES -->
+  <section id="vue-comptes" hidden>
+    <fieldset>
+      <legend>Ajouter un compte</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="c_code">Code</label>
+          <input id="c_code" type="text" maxlength="30" placeholder="CAISSE-DLA">
+        </div>
+        <div>
+          <label for="c_libelle">Libellé</label>
+          <input id="c_libelle" type="text" maxlength="150" placeholder="Caisse principale Douala">
+        </div>
+        <div>
+          <label for="c_type">Type</label>
+          <select id="c_type">
+            <option value="CAISSE">Caisse physique</option>
+            <option value="COFFRE">Coffre</option>
+            <option value="MOBILE_MONEY">Mobile Money</option>
+            <option value="BANQUE">Compte bancaire</option>
+            <option value="CAISSE_CHAUFFEUR">Caisse chauffeur</option>
+          </select>
+        </div>
+        <div>
+          <label for="c_tiroir">Tiroir
+            <span class="aide">à qui appartient cet argent</span>
+          </label>
+          <select id="c_tiroir">
+            <option value="ENTREPRISE">Entreprise</option>
+            <option value="ASSOCIE">Compte courant associé</option>
+          </select>
+        </div>
+        <div>
+          <label for="c_solde">Solde de départ
+            <span class="aide">ce qu'il contient aujourd'hui</span>
+          </label>
+          <input id="c_solde" type="number" min="0" step="1000" value="0">
+        </div>
+        <div>
+          <label for="c_tel">Numéro Mobile Money
+            <span class="aide">si applicable</span>
+          </label>
+          <input id="c_tel" type="tel" maxlength="30">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerCompte()">Ajouter le compte</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ajouter un poste de dépense</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="cat_code">Code</label>
+          <input id="cat_code" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="cat_libelle">Libellé</label>
+          <input id="cat_libelle" type="text" maxlength="150">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerCategorie()">Ajouter le poste</button>
+      </div>
+    </fieldset>
+  </section>
+</main>
+
+<script src="/static/dml.js"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/tresorerie");
+
+let COMPTES = [], CATEGORIES = [];
+
+const TYPES = {
+  CAISSE: "Caisse", COFFRE: "Coffre", MOBILE_MONEY: "Mobile Money",
+  BANQUE: "Banque", CAISSE_CHAUFFEUR: "Caisse chauffeur",
+};
+
+document.querySelectorAll('[role="tab"]').forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
+    b.setAttribute("aria-selected", "true");
+    ["soldes", "operation", "journal", "depenses", "comptes"].forEach(v =>
+      document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
+    DML.cacherMessage("msg");
+    if (b.dataset.vue === "soldes") charger();
+    if (b.dataset.vue === "journal") chargerJournal();
+    if (b.dataset.vue === "depenses") chargerDepenses();
+  });
+});
+
+async function charger() {
+  document.getElementById("o_date").value = new Date().toISOString().slice(0, 10);
+  try {
+    COMPTES = await DML.api("/api/v1/tresorerie/comptes");
+    afficherSoldes();
+    document.getElementById("o_compte").innerHTML = COMPTES.length
+      ? COMPTES.map(c => `<option value="${c.id}">${c.libelle} — ${DML.fcfa(c.solde)}</option>`).join("")
+      : '<option value="">Aucun compte — créez-en un</option>';
+    majSolde();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+
+  try {
+    CATEGORIES = await DML.api("/api/v1/tresorerie/categories");
+    document.getElementById("o_categorie").innerHTML =
+      '<option value="">— aucun —</option>' +
+      CATEGORIES.map(c => `<option value="${c.id}">${c.libelle}</option>`).join("");
+  } catch (e) { /* silencieux */ }
+}
+
+function afficherSoldes() {
+  if (!COMPTES.length) {
+    document.getElementById("tiroirs").innerHTML =
+      '<div class="vide">Aucun compte de trésorerie. Créez votre caisse dans l\\u0027onglet Comptes.</div>';
+    return;
+  }
+  const groupes = { ENTREPRISE: [], ASSOCIE: [] };
+  COMPTES.forEach(c => (groupes[c.tiroir] || groupes.ENTREPRISE).push(c));
+
+  document.getElementById("tiroirs").innerHTML = Object.entries(groupes)
+    .filter(([, liste]) => liste.length)
+    .map(([tiroir, liste]) => {
+      const total = liste.reduce((s, c) => s + Number(c.solde), 0);
+      return `
+        <div class="tiroir-bloc ${tiroir === "ASSOCIE" ? "associe" : ""}">
+          <header>
+            <b>${tiroir === "ASSOCIE" ? "Compte courant associé" : "Trésorerie entreprise"}</b>
+            <span>${liste.length} compte${liste.length > 1 ? "s" : ""}</span>
+          </header>
+          ${liste.map(c => `
+            <div class="compte">
+              <span class="nom">${c.libelle}
+                <small>${TYPES[c.type] || c.type}${c.telephone ? " · " + c.telephone : ""}</small>
+              </span>
+              <span class="montant ${Number(c.solde) <= 0 ? "zero" : ""}">${DML.fcfa(c.solde)}</span>
+            </div>`).join("")}
+          <div class="total-tiroir"><span>Total</span><span>${DML.fcfa(total)}</span></div>
+        </div>`;
+    }).join("");
+}
+
+function compteChoisi() {
+  return COMPTES.find(c => c.id === document.getElementById("o_compte").value);
+}
+
+function majSolde() {
+  const c = compteChoisi();
+  document.getElementById("solde-info").textContent = c
+    ? `en FCFA — ce compte contient ${DML.fcfa(c.solde)}`
+    : "en FCFA";
+}
+
+function majFormulaire() {
+  const sortie = document.getElementById("o_sens").value === "DECAISSEMENT";
+  document.getElementById("bloc-categorie").hidden = !sortie;
+}
+
+async function enregistrer() {
+  DML.cacherMessage("msg");
+  const c = compteChoisi();
+  const libelle = document.getElementById("o_libelle").value.trim();
+  if (!c) { DML.message("msg", "Choisissez un compte.", "erreur"); return; }
+  if (!libelle) { DML.message("msg", "Indiquez le motif de l'opération.", "erreur"); return; }
+  const sens = document.getElementById("o_sens").value;
+  try {
+    const r = await DML.api("/api/v1/tresorerie/mouvements", {
+      method: "POST",
+      body: JSON.stringify({
+        compte_tresorerie_id: c.id,
+        sens,
+        montant: Number(document.getElementById("o_montant").value),
+        libelle,
+        date_mouvement: document.getElementById("o_date").value,
+        mode_reglement: document.getElementById("o_mode").value,
+        beneficiaire: document.getElementById("o_beneficiaire").value.trim() || null,
+        categorie_depense_id: sens === "DECAISSEMENT"
+          ? (document.getElementById("o_categorie").value || null) : null,
+      }),
+    });
+    DML.message("msg",
+      `${r.numero} enregistré — ${DML.fcfa(r.montant)}. ` +
+      `Nouveau solde : ${DML.fcfa(r.nouveau_solde)}.`, "ok");
+    document.getElementById("o_montant").value = "";
+    document.getElementById("o_libelle").value = "";
+    document.getElementById("o_beneficiaire").value = "";
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function chargerJournal() {
+  try {
+    const liste = await DML.api("/api/v1/tresorerie/journal");
+    document.getElementById("table-journal").innerHTML = liste.length ? `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>Pièce</th><th>Date</th><th>Compte</th><th>Motif</th>
+          <th>Poste</th><th>Bénéficiaire</th><th>Tiroir</th><th>Montant</th></tr></thead>
+        <tbody>${liste.map(m => `<tr>
+          <td>${m.numero}</td>
+          <td>${m.date}</td>
+          <td>${m.compte}</td>
+          <td>${m.libelle}</td>
+          <td>${m.categorie}</td>
+          <td>${m.beneficiaire || "—"}</td>
+          <td>${m.tiroir === "ASSOCIE" ? "Associé" : "Entreprise"}</td>
+          <td class="num ${m.sens === "DECAISSEMENT" ? "sens-sortie" : "sens-entree"}">
+            ${m.sens === "DECAISSEMENT" ? "−" : "+"} ${DML.fcfa(m.montant)}</td>
+        </tr>`).join("")}</tbody></table></div>`
+      : '<div class="vide">Aucun mouvement enregistré.</div>';
+  } catch (e) {
+    document.getElementById("table-journal").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function chargerDepenses() {
+  try {
+    const liste = await DML.api("/api/v1/tresorerie/depenses");
+    if (!liste.length) {
+      document.getElementById("table-depenses").innerHTML =
+        '<div class="vide">Aucune dépense enregistrée.</div>';
+      return;
+    }
+    const total = liste.reduce((s, d) => s + Number(d.total), 0);
+    document.getElementById("table-depenses").innerHTML = `
+      <div class="cartes" style="margin-bottom:16px">
+        <div class="carte"><span class="etiquette">Total des dépenses</span>
+          <div class="valeur">${DML.fcfa(total)}</div>
+          <div class="note">${liste.length} poste(s)</div></div>
+      </div>
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>Poste</th><th>Opérations</th><th>Total</th><th>Part</th></tr></thead>
+        <tbody>${liste.map(d => `<tr>
+          <td>${d.libelle}</td>
+          <td class="num">${d.nb_operations}</td>
+          <td class="num">${DML.fcfa(d.total)}</td>
+          <td class="num">${total ? Math.round(Number(d.total) / total * 100) : 0} %</td>
+        </tr>`).join("")}</tbody></table></div>`;
+  } catch (e) {
+    document.getElementById("table-depenses").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function creerCompte() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("c_code").value.trim();
+  const libelle = document.getElementById("c_libelle").value.trim();
+  if (!code || !libelle) { DML.message("msg", "Le code et le libellé sont obligatoires.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/tresorerie/comptes", {
+      method: "POST",
+      body: JSON.stringify({
+        code, libelle,
+        type_compte: document.getElementById("c_type").value,
+        tiroir: document.getElementById("c_tiroir").value,
+        solde_initial: Number(document.getElementById("c_solde").value) || 0,
+        numero_telephone: document.getElementById("c_tel").value.trim() || null,
+      }),
+    });
+    DML.message("msg", `${r.libelle} créé avec ${DML.fcfa(r.solde)}.`, "ok");
+    ["c_code", "c_libelle", "c_tel"].forEach(i => document.getElementById(i).value = "");
+    document.getElementById("c_solde").value = 0;
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function creerCategorie() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("cat_code").value.trim();
+  const libelle = document.getElementById("cat_libelle").value.trim();
+  if (!code || !libelle) { DML.message("msg", "Le code et le libellé sont obligatoires.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/tresorerie/categories", {
+      method: "POST",
+      body: JSON.stringify({ code, libelle }),
+    });
+    DML.message("msg", `Poste ${r.libelle} ajouté.`, "ok");
+    ["cat_code", "cat_libelle"].forEach(i => document.getElementById(i).value = "");
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+majFormulaire();
+charger();
+</script>
+</body>
+</html>

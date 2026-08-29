@@ -46,6 +46,8 @@ const DML = {
       liens.push(["/traitement", "Traitement"]);
     if (DML.peut("vente.livraison.creer"))
       liens.push(["/vente", "Livraisons"]);
+    if (DML.peut("tresorerie.lire"))
+      liens.push(["/tresorerie", "Trésorerie"]);
     if (DML.peut("securite.utilisateur.creer"))
       liens.push(["/utilisateurs", "Comptes"]);
     if (DML.peut("referentiel.collecteur.creer"))

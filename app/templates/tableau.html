@@ -18,6 +18,8 @@
 
   <div id="msg" class="message" hidden></div>
 
+  <section id="alertes"></section>
+
   <!-- SIGNATURE : l'ecart cumule, en fleau de balance -->
   <section id="bloc-ecart"></section>
 
@@ -64,7 +66,29 @@ function table(entetes, lignes) {
   </table></div>`;
 }
 
+async function chargerAlertes() {
+  try {
+    const liste = await DML.api("/api/v1/collecte/tableau/alertes");
+    const zone = document.getElementById("alertes");
+    if (!liste.length) {
+      zone.innerHTML = `<div class="vide">Rien ne demande votre attention aujourd'hui.</div>`;
+      return;
+    }
+    const urgentes = liste.filter(a => a.niveau === "URGENCE").length;
+    zone.innerHTML = `
+      <h2>À traiter${urgentes ? ` — ${urgentes} urgence${urgentes > 1 ? "s" : ""}` : ""}</h2>
+      ${liste.map(a => `
+        <div class="alerte-ligne ${a.niveau.toLowerCase()}">
+          <span class="marque">${a.niveau === "URGENCE" ? "Urgent"
+            : a.niveau === "CRITIQUE" ? "Important" : "À voir"}</span>
+          <span class="txt"><b>${a.titre}</b><span>${a.detail}</span></span>
+          <a href="${a.lien}">${a.action}</a>
+        </div>`).join("")}`;
+  } catch (e) { /* silencieux : l'utilisateur n'a peut-etre pas tous les acces */ }
+}
+
 async function charger() {
+  chargerAlertes();
   let avances = [], ecarts = [], stock = [];
 
   try { avances = await DML.api("/api/v1/collecte/avances/soldes"); }

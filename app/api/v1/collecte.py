@@ -511,3 +511,14 @@ def fiche_reception(
             "fmt": fmt,
         },
     )
+
+
+@router.get("/tableau/alertes", include_in_schema=False)
+def alertes(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Ce qui demande une action aujourd'hui."""
+    from app.repositories.alertes import alertes as calculer
+
+    return calculer(db)

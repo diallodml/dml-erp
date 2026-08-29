@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Reçu d'avance {{ a.numero }}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 18mm; }
+  *{box-sizing:border-box}
+  body{font-family:"Inter",sans-serif;color:#14261F;margin:0;padding:24px;background:#E6E8E1}
+  .feuille{max-width:190mm;margin:0 auto;background:#fff;padding:26px 30px;border:1px solid #C3C8BC}
+  .entete{display:flex;gap:18px;align-items:flex-start;border-bottom:2px solid #14261F;padding-bottom:14px}
+  .entete img{width:74px;height:74px;object-fit:contain}
+  .entete .raison{font-size:21px;line-height:1.15;font-weight:700;letter-spacing:-.02em;color:#2F6B4F}
+  .entete .activite{font-size:12.5px;color:#5A6B60;margin-top:2px}
+  .entete .legal{font-family:"IBM Plex Mono",monospace;font-size:10px;color:#5A6B60;line-height:1.6;margin-top:6px}
+  .titre{text-align:center;margin:22px 0 6px;font-size:19px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .piece{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px;color:#5A6B60;margin-bottom:20px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:18px}
+  th{text-align:left;padding:8px 10px;background:#F2F3EE;width:38%;font-weight:600;border:1px solid #C3C8BC}
+  td{padding:8px 10px;border:1px solid #C3C8BC}
+  .montant{background:#14261F;color:#fff;padding:14px 18px;margin:18px 0;display:flex;justify-content:space-between;align-items:baseline}
+  .montant span{font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  .montant b{font-family:"IBM Plex Mono",monospace;font-size:26px}
+  .lettres{font-size:13px;font-style:italic;margin-bottom:20px;padding:10px 12px;border-left:3px solid #E8A317;background:#FDF8EC}
+  .mention{font-size:12px;color:#5A6B60;margin-bottom:26px;line-height:1.6}
+  .signatures{display:flex;gap:40px;margin-top:34px}
+  .sign{flex:1}
+  .sign b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:52px}
+  .sign .trait{border-top:1px solid #14261F;padding-top:5px;font-size:11px;color:#5A6B60}
+  .pied{margin-top:26px;padding-top:10px;border-top:1px solid #C3C8BC;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:#5A6B60;text-align:center;line-height:1.7}
+  .imprimer{max-width:190mm;margin:0 auto 14px;text-align:right}
+  .imprimer button{background:#E8A317;border:none;padding:9px 20px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  @media print{ body{background:#fff;padding:0} .feuille{border:none;padding:0} .imprimer{display:none} }
+</style>
+</head>
+<body>
+<div class="imprimer"><button onclick="window.print()">Imprimer</button></div>
+
+<div class="feuille">
+  <div class="entete">
+    <img src="{{ logo }}" alt="" onerror="this.style.display='none'">
+    <div>
+      <div class="raison">{{ e.denomination }}</div>
+      <div class="activite">{{ e.activite }}</div>
+      <div class="legal">
+        {{ e.adresse }}<br>
+        Tel. {{ e.telephone }} &nbsp;·&nbsp; {{ e.telephone_2 }} &nbsp;·&nbsp; {{ e.email }}<br>
+        NIU {{ e.niu }} &nbsp;·&nbsp; RCCM {{ e.rccm }}
+      </div>
+    </div>
+  </div>
+
+  <div class="titre">Reçu d'avance</div>
+  <div class="piece">N° {{ a.numero }} &nbsp;—&nbsp; {{ a.date_remise }}</div>
+
+  <table>
+    <tr><th>Reçu de</th><td>{{ e.denomination }}</td></tr>
+    <tr><th>Remis à</th><td><strong>{{ collecteur.nom }}</strong>{% if collecteur.telephone %} — {{ collecteur.telephone }}{% endif %}</td></tr>
+    {% if collecteur.piece_identite %}<tr><th>Pièce d'identité</th><td>{{ collecteur.piece_identite }}</td></tr>{% endif %}
+    <tr><th>Mode de remise</th><td>{{ a.mode_remise }}</td></tr>
+    <tr><th>Objet</th><td>{{ a.objet or "Avance pour achat de produits agricoles" }}</td></tr>
+  </table>
+
+  <div class="montant">
+    <span>Montant remis</span>
+    <b>{{ montant_formate }} FCFA</b>
+  </div>
+
+  <div class="lettres">Arrêté la présente avance à la somme de {{ montant_lettres }} francs CFA.</div>
+
+  <div class="mention">
+    Le bénéficiaire reconnaît avoir reçu la somme ci-dessus à titre d'avance, destinée
+    exclusivement à l'achat de produits agricoles pour le compte de {{ e.sigle }}.
+    Il s'engage à en justifier l'emploi par la remise des marchandises correspondantes,
+    et à restituer tout solde non employé.
+  </div>
+
+  <div class="signatures">
+    <div class="sign">
+      <b>Le bénéficiaire</b>
+      <div class="trait">{{ collecteur.nom }} — lu et approuvé</div>
+    </div>
+    <div class="sign">
+      <b>Pour {{ e.sigle }}</b>
+      <div class="trait">Nom, signature et cachet</div>
+    </div>
+  </div>
+
+  <div class="pied">
+    {{ e.produits }}<br>
+    {{ e.denomination }} — NIU {{ e.niu }} — RCCM {{ e.rccm }} — {{ e.centre_impots }}<br>
+    « {{ e.devise_slogan }} » — {{ e.valeurs }}
+  </div>
+</div>
+</body>
+</html>

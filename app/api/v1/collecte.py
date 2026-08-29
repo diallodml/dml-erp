@@ -4,7 +4,7 @@ from datetime import date
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.orm import Session
 
 from app.core.deps import exiger_permission, get_db, utilisateur_courant
@@ -365,3 +365,91 @@ def lots_en_magasin(
     return resultats
 
 
+
+
+@router.get("/avances/{avance_id}/recu", include_in_schema=False)
+def recu_avance(
+    avance_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Recu imprimable, a faire signer par le collecteur."""
+    from fastapi.templating import Jinja2Templates
+
+    from app.core.entreprise import ENTREPRISE
+    from app.models import AvanceCollecteur, Collecteur
+
+    a = db.get(AvanceCollecteur, avance_id)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Avance introuvable")
+    c = db.get(Collecteur, a.collecteur_id)
+
+    import base64
+    import pathlib
+
+    logo = ""
+    chemin = pathlib.Path("app/static/logo.jpeg")
+    if chemin.exists():
+        logo = "data:image/jpeg;base64," + base64.b64encode(chemin.read_bytes()).decode()
+
+    templates = Jinja2Templates(directory="app/templates")
+    montant = int(a.montant_remis)
+    return templates.TemplateResponse(
+        request,
+        "recu_avance.html",
+        {
+            "e": ENTREPRISE,
+            "logo": logo,
+            "a": a,
+            "collecteur": c,
+            "montant_formate": f"{montant:,}".replace(",", " "),
+            "montant_lettres": _en_lettres(montant),
+        },
+    )
+
+
+def _en_lettres(n: int) -> str:
+    """Convertit un montant en toutes lettres, pour la mention legale."""
+    unites = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit",
+              "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze",
+              "seize", "dix-sept", "dix-huit", "dix-neuf"]
+    dizaines = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante",
+                "soixante", "quatre-vingt", "quatre-vingt"]
+
+    def moins_cent(x):
+        if x < 20:
+            return unites[x]
+        d, u = divmod(x, 10)
+        if d in (7, 9):
+            d -= 1
+            u += 10
+        mot = dizaines[d]
+        if d == 8 and u == 0:
+            mot += "s"
+        if u == 1 and d not in (8, 9):
+            return mot + " et un"
+        return mot + ("-" + unites[u] if u else "")
+
+    def moins_mille(x):
+        c, r = divmod(x, 100)
+        if c == 0:
+            return moins_cent(r)
+        mot = "cent" if c == 1 else unites[c] + " cent"
+        if c > 1 and r == 0:
+            mot += "s"
+        return mot + (" " + moins_cent(r) if r else "")
+
+    if n == 0:
+        return "zero"
+    parties = []
+    for valeur, nom in ((1000000000, "milliard"), (1000000, "million"), (1000, "mille")):
+        q, n = divmod(n, valeur)
+        if q:
+            if nom == "mille":
+                parties.append("mille" if q == 1 else moins_mille(q) + " mille")
+            else:
+                parties.append(moins_mille(q) + f" {nom}" + ("s" if q > 1 else ""))
+    if n:
+        parties.append(moins_mille(n))
+    return " ".join(parties)

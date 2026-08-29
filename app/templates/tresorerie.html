@@ -114,6 +114,11 @@
   <!-- JOURNAL -->
   <section id="vue-journal" hidden>
     <h2>Derniers mouvements</h2>
+    <div class="actions" style="margin-bottom:14px;margin-top:0">
+      <button class="bouton secondaire"
+        onclick="DML.telecharger('/api/v1/export/tresorerie','tresorerie.csv')">
+        Exporter pour le comptable</button>
+    </div>
     <div id="table-journal"></div>
   </section>
 

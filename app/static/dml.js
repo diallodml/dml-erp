@@ -81,6 +81,21 @@ const DML = {
       </header>`);
   },
 
+  async telecharger(url, nom) {
+    try {
+      const r = await fetch(url, {
+        headers: { "Authorization": "Bearer " + DML.jeton() },
+      });
+      if (!r.ok) throw new Error("Export indisponible");
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = nom;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { alert(e.message); }
+  },
+
   // Formatage
   fcfa(v)   { return new Intl.NumberFormat("fr-FR").format(Math.round(Number(v) || 0)) + " F"; },
   kg(v)     { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Number(v) || 0) + " kg"; },

@@ -43,6 +43,8 @@
       <button data-filtre="tous" aria-pressed="true">Toutes</button>
       <button data-filtre="impaye" aria-pressed="false">Impayées</button>
       <button data-filtre="paye" aria-pressed="false">Encaissées</button>
+      <button style="margin-left:auto;background:none;border:1px solid var(--encre);color:var(--encre)"
+        onclick="DML.telecharger('/api/v1/export/ventes','ventes.csv')">Exporter</button>
     </div>
     <div id="table-livraisons"></div>
   </section>

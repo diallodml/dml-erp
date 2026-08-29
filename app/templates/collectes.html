@@ -47,6 +47,8 @@
       <button data-filtre="EN_COURS" aria-pressed="false">En cours</button>
       <button data-filtre="RECEPTIONNEE" aria-pressed="false">Réceptionnées</button>
       <button data-filtre="attente" aria-pressed="false">Pas encore en stock</button>
+      <button style="margin-left:auto;background:none;border:1px solid var(--encre);color:var(--encre)"
+        onclick="DML.telecharger('/api/v1/export/collectes','collectes.csv')">Exporter</button>
     </div>
     <div id="table-collectes"></div>
   </section>

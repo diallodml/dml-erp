@@ -179,3 +179,78 @@ def bon_livraison(
             "fmt": fmt,
         },
     )
+
+
+@router.get("/liste",
+            dependencies=[Depends(exiger_permission("vente.reversement.lire"))])
+def liste_livraisons(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """
+    Toutes les livraisons, de la plus recente a la plus ancienne.
+
+    Repond a : qui a recu quoi, et qui n'a pas encore paye ?
+    """
+    from decimal import Decimal
+
+    from app.models import (
+        Lot,
+        Magasin,
+        MouvementStock,
+        MouvementTresorerie,
+        Produit,
+    )
+    from app.models.enums import SensMouvement, TypeMouvementStock
+
+    lignes = (
+        db.query(MouvementStock, Produit.designation, Lot.numero, Magasin.nom)
+        .outerjoin(Produit, Produit.id == MouvementStock.produit_id)
+        .outerjoin(Lot, Lot.id == MouvementStock.lot_id)
+        .outerjoin(Magasin, Magasin.id == MouvementStock.magasin_source_id)
+        .filter(
+            MouvementStock.type_mouvement == TypeMouvementStock.SORTIE_VENTE,
+            MouvementStock.sens == SensMouvement.SORTIE,
+        )
+        .order_by(MouvementStock.date_mouvement.desc())
+        .limit(200)
+        .all()
+    )
+
+    # Les encaissements portent le numero du lot dans leur libelle
+    encaissements = {}
+    for m in db.query(MouvementTresorerie).filter(
+        MouvementTresorerie.libelle.like("Vente %")
+    ).all():
+        cle = m.libelle
+        encaissements[cle] = encaissements.get(cle, Decimal("0")) + m.montant
+
+    resultats = []
+    for mvt, produit, lot_numero, magasin in lignes:
+        champs = (mvt.observations or "").split("|")
+        while len(champs) < 5:
+            champs.append("")
+
+        cout = (mvt.quantite * (mvt.cout_unitaire or Decimal("0"))).quantize(Decimal("0.01"))
+
+        resultats.append({
+            "id": str(mvt.id),
+            "numero": mvt.numero,
+            "date": mvt.date_mouvement,
+            "client": champs[0] or "—",
+            "lieu": champs[1] or "—",
+            "transporteur": champs[2] or "—",
+            "immatriculation": champs[3] or "—",
+            "produit": produit or "—",
+            "lot": lot_numero or "—",
+            "magasin": magasin or "—",
+            "quantite_kg": mvt.quantite,
+            "tonnes": (mvt.quantite / Decimal("1000")).quantize(Decimal("0.001")),
+            "cout_unitaire": mvt.cout_unitaire,
+            "cout_total": cout,
+            "montant_vente": mvt.montant_vente or Decimal("0"),
+            "montant_encaisse": mvt.montant_encaisse or Decimal("0"),
+            "reste_du": (mvt.montant_vente or Decimal("0")) - (mvt.montant_encaisse or Decimal("0")),
+            "marge": (mvt.montant_vente or Decimal("0")) - cout,
+        })
+    return resultats

@@ -82,3 +82,8 @@ def page_tresorerie(request: Request):
 @app.get("/collectes", response_class=HTMLResponse, include_in_schema=False)
 def page_collectes(request: Request):
     return templates.TemplateResponse(request, "collectes.html")
+
+
+@app.get("/livraisons", response_class=HTMLResponse, include_in_schema=False)
+def page_livraisons(request: Request):
+    return templates.TemplateResponse(request, "livraisons.html")

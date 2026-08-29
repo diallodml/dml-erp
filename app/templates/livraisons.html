@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Livraisons — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css?v=4">
+<style>
+  .puce{
+    display:inline-block;padding:2px 9px;font-family:var(--data);
+    font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;border:1px solid;
+  }
+  .puce.paye  {background:rgba(47,107,79,.14);border-color:var(--gain);color:var(--gain)}
+  .puce.impaye{background:var(--perte);border-color:var(--perte);color:#fff}
+  .filtres{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .filtres button{
+    background:var(--sisal-2);border:1px solid var(--trait);color:var(--texte-doux);
+    padding:7px 14px;font-family:var(--corps);font-size:13.5px;cursor:pointer;
+  }
+  .filtres button[aria-pressed="true"]{
+    background:var(--encre);border-color:var(--encre);color:var(--sisal-2);font-weight:600;
+  }
+  .actions-ligne button{padding:4px 9px;font-size:12px;white-space:nowrap}
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Livraisons</h1>
+    <p>Ce qui est parti, chez qui, et qui n'a pas encore payé.</p>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <section id="resume"></section>
+
+  <section>
+    <h2>Historique</h2>
+    <div class="filtres">
+      <button data-filtre="tous" aria-pressed="true">Toutes</button>
+      <button data-filtre="impaye" aria-pressed="false">Impayées</button>
+      <button data-filtre="paye" aria-pressed="false">Encaissées</button>
+    </div>
+    <div id="table-livraisons"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js?v=4"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/livraisons");
+
+let LIVRAISONS = [], FILTRE = "tous";
+
+document.querySelectorAll(".filtres button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".filtres button")
+      .forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+    FILTRE = b.dataset.filtre;
+    afficher();
+  });
+});
+
+async function charger() {
+  try {
+    LIVRAISONS = await DML.api("/api/v1/vente/liste");
+    resume();
+    afficher();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function resume() {
+  const impayees = LIVRAISONS.filter(l => Number(l.reste_du) > 0);
+  const totalDu = impayees.reduce((s, l) => s + Number(l.reste_du), 0);
+  const vendu = LIVRAISONS.reduce((s, l) => s + Number(l.montant_vente), 0);
+  const marge = LIVRAISONS.reduce((s, l) => s + Number(l.marge), 0);
+  const tonnes = LIVRAISONS.reduce((s, l) => s + Number(l.tonnes), 0);
+
+  document.getElementById("resume").innerHTML = totalDu > 0
+    ? `<div class="balance">
+         <div class="titre">Ce que les clients vous doivent</div>
+         <div class="chiffre negatif">${DML.fcfa(totalDu)}</div>
+         <div class="sous">
+           ${impayees.length} livraison${impayees.length > 1 ? "s" : ""} non encaissée${impayees.length > 1 ? "s" : ""}.
+           ${impayees.length ? "La plus ancienne date du " + impayees[impayees.length - 1].date.slice(0, 10) + "." : ""}
+         </div>
+         <div class="cartes" style="margin-top:16px">
+           <div class="carte"><span class="etiquette">Total vendu</span>
+             <div class="valeur">${DML.fcfa(vendu)}</div></div>
+           <div class="carte"><span class="etiquette">Marge brute</span>
+             <div class="valeur ${marge < 0 ? "alerte" : ""}">${DML.fcfa(marge)}</div></div>
+           <div class="carte"><span class="etiquette">Tonnage livré</span>
+             <div class="valeur">${DML.tonnes(tonnes)}</div></div>
+         </div>
+       </div>`
+    : `<div class="cartes">
+         <div class="carte"><span class="etiquette">Total vendu</span>
+           <div class="valeur">${DML.fcfa(vendu)}</div></div>
+         <div class="carte"><span class="etiquette">Marge brute</span>
+           <div class="valeur ${marge < 0 ? "alerte" : ""}">${DML.fcfa(marge)}</div></div>
+         <div class="carte"><span class="etiquette">Tonnage livré</span>
+           <div class="valeur">${DML.tonnes(tonnes)}</div>
+           <div class="note">tout est encaissé</div></div>
+       </div>`;
+}
+
+function afficher() {
+  let liste = LIVRAISONS;
+  if (FILTRE === "impaye") liste = LIVRAISONS.filter(l => Number(l.reste_du) > 0);
+  if (FILTRE === "paye") liste = LIVRAISONS.filter(l => Number(l.reste_du) <= 0);
+
+  if (!liste.length) {
+    document.getElementById("table-livraisons").innerHTML =
+      `<div class="vide">${FILTRE === "tous"
+        ? "Aucune livraison enregistrée."
+        : "Aucune livraison dans cette catégorie."}</div>`;
+    return;
+  }
+
+  document.getElementById("table-livraisons").innerHTML = `
+    <div class="enveloppe-table"><table>
+      <thead><tr>
+        <th>État</th><th>Pièce</th><th>Date</th><th>Client</th><th>Produit</th>
+        <th>Lot</th><th>Quantité</th><th>Vente</th><th>Coût</th><th>Marge</th>
+        <th>Reste dû</th><th></th>
+      </tr></thead>
+      <tbody>${liste.map(l => {
+        const impaye = Number(l.reste_du) > 0;
+        return `<tr>
+          <td><span class="puce ${impaye ? "impaye" : "paye"}">${impaye ? "Impayé" : "Payé"}</span></td>
+          <td>${l.numero}</td>
+          <td>${l.date ? l.date.slice(0, 10) : "—"}</td>
+          <td>${l.client}</td>
+          <td>${l.produit}</td>
+          <td>${l.lot}</td>
+          <td class="num">${DML.tonnes(l.tonnes)}</td>
+          <td class="num">${DML.fcfa(l.montant_vente)}</td>
+          <td class="num">${DML.fcfa(l.cout_total)}</td>
+          <td class="num ${Number(l.marge) < 0 ? "negatif" : ""}">${DML.fcfa(l.marge)}</td>
+          <td class="num ${impaye ? "negatif" : ""}">${DML.fcfa(l.reste_du)}</td>
+          <td><div class="actions-ligne">
+            <button class="bouton secondaire"
+              onclick="ouvrirDoc('/api/v1/vente/livraisons/${l.id}/bon')">Bon</button>
+          </div></td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table></div>`;
+}
+
+async function ouvrirDoc(url) {
+  try {
+    const r = await fetch(url, { headers: { "Authorization": "Bearer " + DML.jeton() } });
+    if (!r.ok) throw new Error("Document indisponible");
+    const html = await r.text();
+    const blob = new Blob([html], { type: "text/html" });
+    const u = URL.createObjectURL(blob);
+    const f = window.open(u, "_blank");
+    if (!f) location.href = u;
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+charger();
+</script>
+</body>
+</html>

@@ -100,6 +100,40 @@
     <div id="table-reversements"></div>
   </section>
 </main>
+  <div id="fenetre-paiement" hidden
+       style="position:fixed;inset:0;background:rgba(20,38,31,.55);display:grid;place-items:center;z-index:50">
+    <div style="background:var(--sisal-2);border:1px solid var(--trait);padding:22px 24px;max-width:420px;width:92%">
+      <h2 style="font-family:var(--display);font-size:18px;margin:0 0 4px">Payer le collecteur</h2>
+      <p id="pay-qui" style="margin:0 0 16px;color:var(--texte-doux);font-size:13.5px"></p>
+      <div style="margin-bottom:12px">
+        <label for="pay_montant">Montant à verser</label>
+        <input id="pay_montant" type="number" min="1" step="500">
+      </div>
+      <div style="margin-bottom:12px">
+        <label for="pay_compte">Compte</label>
+        <select id="pay_compte"></select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label for="pay_mode">Mode de règlement</label>
+        <select id="pay_mode">
+          <option value="MOBILE_MONEY">Mobile Money</option>
+          <option value="ESPECES">Espèces</option>
+          <option value="VIREMENT">Virement</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px">
+        <label for="pay_ref">Référence
+          <span class="aide">numéro de transaction, facultatif</span>
+        </label>
+        <input id="pay_ref" type="text" maxlength="120">
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="confirmerPaiement()">Verser</button>
+        <button class="bouton secondaire" onclick="fermerPaiement()">Annuler</button>
+      </div>
+    </div>
+  </div>
+
 
 <script src="/static/dml.js?v=3"></script>
 <script>
@@ -299,22 +333,49 @@ async function listerReversements() {
 }
 
 async function payer(id, nom, solde) {
-  const saisi = prompt(`Montant à verser à ${nom}, en FCFA :`, solde);
-  if (saisi === null) return;
+  window.PAIEMENT = { id, nom, solde };
+  document.getElementById("pay-qui").textContent =
+    `${nom} — solde dû ${DML.fcfa(solde)}`;
+  document.getElementById("pay_montant").value = solde;
+  document.getElementById("pay_montant").max = solde;
+  const comptes = window.COMPTES || [];
+  document.getElementById("pay_compte").innerHTML = comptes.length
+    ? comptes.map(c => `<option value="${c.id}">${c.libelle} (${DML.fcfa(c.solde)})</option>`).join("")
+    : '<option value="">Aucun compte — le solde ne bougera pas</option>';
+  document.getElementById("fenetre-paiement").hidden = false;
+}
+
+function fermerPaiement() {
+  document.getElementById("fenetre-paiement").hidden = true;
+}
+
+async function confirmerPaiement() {
+  const p = window.PAIEMENT;
+  if (!p) return;
+  const montant = Number(document.getElementById("pay_montant").value);
+  if (!montant || montant <= 0) { alert("Saisissez un montant."); return; }
   try {
-    const r = await DML.api(`/api/v1/vente/reversements/${id}/paiement`, {
+    const r = await DML.api(`/api/v1/vente/reversements/${p.id}/paiement`, {
       method: "POST",
       body: JSON.stringify({
-        montant_paye: Number(saisi),
+        montant_paye: montant,
         date_paiement: new Date().toISOString().slice(0, 10),
-        mode_paiement: "MOBILE_MONEY",
-        compte_tresorerie_id: (window.COMPTES && window.COMPTES.length)
-          ? window.COMPTES[0].id : null,
+        mode_paiement: document.getElementById("pay_mode").value,
+        reference_paiement: document.getElementById("pay_ref").value.trim() || null,
+        compte_tresorerie_id: document.getElementById("pay_compte").value || null,
       }),
     });
-    DML.message("msg", `${r.numero} — ${DML.fcfa(r.montant_paye)} versés. Solde : ${DML.fcfa(r.solde)}.`, "ok");
+    fermerPaiement();
+    DML.message("msg",
+      `${r.numero} — ${DML.fcfa(r.montant_paye)} versés à ${p.nom}. ` +
+      `Solde : ${DML.fcfa(r.solde)}.`, "ok");
+    document.getElementById("pay_ref").value = "";
     listerReversements();
-  } catch (e) { DML.message("msg", e.message, "erreur"); }
+    charger();
+  } catch (e) {
+    fermerPaiement();
+    DML.message("msg", e.message, "erreur");
+  }
 }
 
 charger();

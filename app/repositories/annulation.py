@@ -25,11 +25,13 @@ from app.models import (
     Utilisateur,
 )
 from app.models.enums import (
+    TypeAction,
     SensMouvement,
     StatutAvanceCollecteur,
     StatutCollecte,
     TypeMouvementStock,
 )
+from app.repositories.audit import tracer
 from app.repositories.collecte import _recalculer_totaux, prochain_numero
 
 
@@ -84,6 +86,9 @@ def annuler_avance(
     a.statut = StatutAvanceCollecteur.LITIGIEUSE
     a.montant_reste_du = Decimal("0")
     a.updated_by_id = utilisateur.id
+    tracer(db, utilisateur, TypeAction.SUPPRIMER, "avances_collecteur", a.id,
+           avant={"numero": a.numero, "montant": a.montant_remis},
+           commentaire=motif)
     db.commit()
     return {"numero": a.numero, "message": "Avance annulee"}
 
@@ -105,6 +110,10 @@ def annuler_ligne(
     _verifier_droit(utilisateur, l.date_achat, "annulation.ligne")
 
     numero = l.numero_ligne
+    tracer(db, utilisateur, TypeAction.SUPPRIMER, "lignes_collecte", l.id,
+           avant={"ligne": l.numero_ligne, "sacs": l.nombre_sacs,
+                  "montant": l.montant, "collecte": collecte.numero},
+           commentaire=motif)
     db.delete(l)
     db.flush()
     _recalculer_totaux(db, collecte)
@@ -139,6 +148,10 @@ def annuler_reception(
 
     _verifier_droit(utilisateur, c.date_reception_magasin, "annulation.reception")
 
+    poids_avant = c.poids_reel_kg
+    ecart_avant = c.ecart_poids_kg
+    humidite_avant = c.taux_humidite_magasin
+
     # Rendre l'avance a son etat anterieur
     if c.avance_id:
         avance = db.get(AvanceCollecteur, c.avance_id)
@@ -161,6 +174,10 @@ def annuler_reception(
     c.magasin_destination_id = None
     c.observations = ((c.observations or "") + f"\nReception annulee : {motif}").strip()
     c.updated_by_id = utilisateur.id
+    tracer(db, utilisateur, TypeAction.SUPPRIMER, "collectes", c.id,
+           avant={"numero": c.numero, "poids_reel": poids_avant,
+                  "ecart": ecart_avant, "humidite": humidite_avant},
+           commentaire=motif)
     db.commit()
     return {"numero": c.numero, "message": "Reception annulee, collecte rouverte"}
 
@@ -216,6 +233,10 @@ def extourner_lot(
     lot.is_deleted = True
     lot.deleted_at = datetime.now(timezone.utc)
     lot.deleted_reason = motif
+    tracer(db, utilisateur, TypeAction.SUPPRIMER, "lots", lot.id,
+           avant={"numero": lot.numero, "quantite": lot.quantite_initiale,
+                  "valeur": lot.valeur_stock},
+           commentaire=motif)
     db.commit()
     return {
         "lot": lot.numero,

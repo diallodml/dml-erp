@@ -105,7 +105,14 @@ def fixer_plafond(
     c = db.get(Collecteur, collecteur_id)
     if c is None:
         raise HTTPException(status_code=404, detail="Collecteur introuvable")
+    from app.models.enums import TypeAction
+    from app.repositories.audit import tracer
+
+    ancien = c.plafond_avance
     c.plafond_avance = donnees.plafond_avance
+    tracer(db, utilisateur, TypeAction.MODIFIER, "collecteurs", c.id,
+           avant={"plafond": ancien}, apres={"plafond": donnees.plafond_avance},
+           commentaire=f"Plafond d'avance de {c.nom}")
     db.commit()
     return {"id": str(c.id), "nom": c.nom, "plafond_avance": c.plafond_avance}
 

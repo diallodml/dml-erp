@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journal — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css?v=4">
+<style>
+  .puce{
+    display:inline-block;padding:2px 9px;font-family:var(--data);
+    font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;border:1px solid;
+  }
+  .puce.supprimer{background:rgba(168,50,45,.14);border-color:var(--perte);color:var(--perte)}
+  .puce.modifier {background:rgba(232,163,23,.20);border-color:#B07B0C;color:#7A5507}
+  .puce.valider  {background:rgba(47,107,79,.14);border-color:var(--gain);color:var(--gain)}
+  .puce.autre    {background:none;border-color:var(--trait);color:var(--texte-doux)}
+  .valeurs{font-family:var(--data);font-size:11.5px;color:var(--texte-doux);line-height:1.6}
+  .valeurs b{color:var(--texte)}
+  .filtres{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
+  .filtres > div{min-width:150px}
+  .motif{font-size:12.5px;font-style:italic}
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Journal des actions</h1>
+    <p>Qui a annulé, modifié ou payé quoi. Ce journal ne s'efface pas — c'est ce qui lui donne sa valeur.</p>
+  </div>
+
+  <div class="filtres">
+    <div>
+      <label for="f_user">Utilisateur</label>
+      <select id="f_user" onchange="charger()"></select>
+    </div>
+    <div>
+      <label for="f_depuis">Depuis le</label>
+      <input id="f_depuis" type="date" onchange="charger()">
+    </div>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+  <div id="table-journal"></div>
+</main>
+
+<script src="/static/dml.js?v=4"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/audit");
+
+const TABLES = {
+  avances_collecteur: "Avance",
+  lignes_collecte: "Achat au marché",
+  collectes: "Collecte",
+  lots: "Lot en stock",
+  collecteurs: "Collecteur",
+  reversements_collecteur: "Reversement",
+};
+
+const ACTIONS = {
+  SUPPRIMER: "Annulation",
+  MODIFIER: "Modification",
+  VALIDER: "Paiement",
+  CREER: "Création",
+};
+
+async function init() {
+  const il_y_a_30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  document.getElementById("f_depuis").value = il_y_a_30;
+  try {
+    const users = await DML.api("/api/v1/utilisateurs");
+    document.getElementById("f_user").innerHTML =
+      '<option value="">Tous</option>' +
+      users.map(u => `<option value="${u.id}">${u.nom_affichage}</option>`).join("");
+  } catch (e) { /* silencieux */ }
+  charger();
+}
+
+async function charger() {
+  DML.cacherMessage("msg");
+  const u = document.getElementById("f_user").value;
+  const d = document.getElementById("f_depuis").value;
+  const params = [];
+  if (u) params.push("utilisateur_id=" + u);
+  if (d) params.push("depuis=" + d);
+  try {
+    const lignes = await DML.api("/api/v1/audit" + (params.length ? "?" + params.join("&") : ""));
+    afficher(lignes);
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function valeurs(obj) {
+  if (!obj) return "";
+  return Object.entries(obj)
+    .map(([k, v]) => `${k} <b>${typeof v === "number" ? DML.fcfa(v) : v}</b>`)
+    .join(" · ");
+}
+
+function afficher(lignes) {
+  if (!lignes.length) {
+    document.getElementById("table-journal").innerHTML =
+      '<div class="vide">Aucune action enregistrée sur cette période.</div>';
+    return;
+  }
+  document.getElementById("table-journal").innerHTML = `
+    <div class="enveloppe-table"><table>
+      <thead><tr>
+        <th>Quand</th><th>Qui</th><th>Quoi</th><th>Sur</th>
+        <th>Valeurs</th><th>Motif</th>
+      </tr></thead>
+      <tbody>${lignes.map(l => {
+        const cls = (ACTIONS[l.action] ? l.action.toLowerCase() : "autre");
+        return `<tr>
+          <td>${new Date(l.horodatage).toLocaleString("fr-FR", {
+            day: "2-digit", month: "2-digit", year: "numeric",
+            hour: "2-digit", minute: "2-digit" })}</td>
+          <td>${l.utilisateur}</td>
+          <td><span class="puce ${cls}">${ACTIONS[l.action] || l.action}</span></td>
+          <td>${TABLES[l.table] || l.table}</td>
+          <td class="valeurs">
+            ${l.avant ? "avant : " + valeurs(l.avant) : ""}
+            ${l.avant && l.apres ? "<br>" : ""}
+            ${l.apres ? "après : " + valeurs(l.apres) : ""}
+          </td>
+          <td class="motif">${l.commentaire || "—"}</td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table></div>`;
+}
+
+init();
+</script>
+</body>
+</html>

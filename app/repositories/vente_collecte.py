@@ -212,6 +212,13 @@ def payer_reversement(
     )
     r.updated_by_id = utilisateur.id
 
+    from app.models.enums import TypeAction
+    from app.repositories.audit import tracer
+    tracer(db, utilisateur, TypeAction.VALIDER, "reversements_collecteur", r.id,
+           apres={"montant_paye": montant, "mode": donnees.mode_paiement,
+                  "reference": donnees.reference_paiement},
+           commentaire=f"Paiement du reversement {r.numero}")
+
     # L'argent sort reellement d'une caisse
     if donnees.compte_tresorerie_id:
         from app.models import CompteTresorerie, MouvementTresorerie

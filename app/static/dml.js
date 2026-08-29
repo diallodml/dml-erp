@@ -56,6 +56,8 @@ const DML = {
       liens.push(["/rentabilite", "Résultat"]);
     if (DML.peut("securite.utilisateur.creer"))
       liens.push(["/utilisateurs", "Comptes"]);
+    if (DML.peut("audit.lire"))
+      liens.push(["/audit", "Journal"]);
     if (DML.peut("referentiel.collecteur.creer"))
       liens.push(["/referentiel", "Référentiels"]);
     if (DML.peut("referentiel.collecteur.lire"))

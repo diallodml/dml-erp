@@ -80,6 +80,15 @@ def livrer(db: Session, donnees, utilisateur: Utilisateur) -> dict:
         cout_unitaire=lot.cout_unitaire,
         created_by_id=utilisateur.id,
     )
+    # Informations de livraison, reprises sur le bon
+    parties = [
+        donnees.client_nom,
+        donnees.lieu_livraison,
+        donnees.transporteur,
+        donnees.immatriculation,
+        donnees.telephone_chauffeur,
+    ]
+    mouvement.observations = "|".join(p or "" for p in parties)
     db.add(mouvement)
 
     lot.quantite_disponible = lot.quantite_disponible - donnees.quantite_kg
@@ -133,7 +142,9 @@ def livrer(db: Session, donnees, utilisateur: Utilisateur) -> dict:
     db.commit()
     db.refresh(lot)
 
+    db.refresh(mouvement)
     resultat = {
+        "mouvement_id": str(mouvement.id),
         "lot": lot.numero,
         "quantite_livree_kg": donnees.quantite_kg,
         "reste_en_stock_kg": lot.quantite_disponible,

@@ -22,6 +22,7 @@
     <button role="tab" data-vue="produits" aria-selected="false">Produits</button>
     <button role="tab" data-vue="magasins" aria-selected="false">Magasins</button>
     <button role="tab" data-vue="prestataires" aria-selected="false">Prestataires</button>
+    <button role="tab" data-vue="clients" aria-selected="false">Clients</button>
   </div>
 
   <div id="msg" class="message" hidden></div>
@@ -271,6 +272,63 @@
       </div>
     </fieldset>
   </section>
+
+  <section id="vue-clients" hidden>
+    <fieldset>
+      <legend>Ajouter un client</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="cl_code">Code
+            <span class="aide">ex. CLI-BRASSERIE</span>
+          </label>
+          <input id="cl_code" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="cl_raison">Raison sociale</label>
+          <input id="cl_raison" type="text" maxlength="200">
+        </div>
+        <div>
+          <label for="cl_type">Type</label>
+          <select id="cl_type">
+            <option value="INDUSTRIEL">Industriel</option>
+            <option value="GROSSISTE">Grossiste</option>
+            <option value="EXPORTATEUR">Exportateur</option>
+            <option value="DETAILLANT">Détaillant</option>
+            <option value="ONG_INSTITUTION">ONG / Institution</option>
+          </select>
+        </div>
+        <div>
+          <label for="cl_contact">Contact</label>
+          <input id="cl_contact" type="text" maxlength="150">
+        </div>
+        <div>
+          <label for="cl_tel">Téléphone</label>
+          <input id="cl_tel" type="tel" maxlength="30">
+        </div>
+        <div>
+          <label for="cl_ville">Ville</label>
+          <input id="cl_ville" type="text" value="Douala" maxlength="80">
+        </div>
+        <div>
+          <label for="cl_niu">NIU
+            <span class="aide">pour la facturation</span>
+          </label>
+          <input id="cl_niu" type="text" maxlength="30">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="cl_adresse">Adresse de livraison
+          <span class="aide">figurera sur le bon de livraison</span>
+        </label>
+        <input id="cl_adresse" type="text" maxlength="255">
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerClient()">Ajouter le client</button>
+      </div>
+    </fieldset>
+    <h2>Clients enregistrés</h2>
+    <div id="table-clients"></div>
+  </section>
 </main>
 
 <script src="/static/dml.js?v=3"></script>
@@ -283,11 +341,12 @@ document.querySelectorAll('[role="tab"]').forEach(b => {
   b.addEventListener("click", () => {
     document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
     b.setAttribute("aria-selected", "true");
-    ["collecteurs", "marches", "produits", "magasins", "prestataires"].forEach(v =>
+    ["collecteurs", "marches", "produits", "magasins", "prestataires", "clients"].forEach(v =>
       document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
     DML.cacherMessage("msg");
     if (b.dataset.vue === "produits") listerProduits();
     if (b.dataset.vue === "magasins") listerMagasins();
+    if (b.dataset.vue === "clients") listerClients();
   });
 });
 
@@ -509,6 +568,50 @@ async function creerPrestataire() {
     DML.message("msg", `${r.nom} ajouté, avec son magasin « ${r.magasin} ».`, "ok");
     ["pr_code", "pr_nom", "pr_tel", "pr_prix", "pr_delai"].forEach(i => document.getElementById(i).value = "");
   } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+
+async function creerClient() {
+  DML.cacherMessage("msg");
+  const code = document.getElementById("cl_code").value.trim();
+  const raison = document.getElementById("cl_raison").value.trim();
+  if (!code || !raison) { DML.message("msg", "Le code et la raison sociale sont obligatoires.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/referentiel/clients", {
+      method: "POST",
+      body: JSON.stringify({
+        code, raison_sociale: raison,
+        type_client: document.getElementById("cl_type").value,
+        contact_principal: document.getElementById("cl_contact").value.trim() || null,
+        telephone: document.getElementById("cl_tel").value.trim() || null,
+        ville: document.getElementById("cl_ville").value.trim() || "Douala",
+        niu: document.getElementById("cl_niu").value.trim() || null,
+        adresse_livraison: document.getElementById("cl_adresse").value.trim() || null,
+      }),
+    });
+    DML.message("msg", `Client ${r.raison_sociale} ajouté.`, "ok");
+    ["cl_code", "cl_raison", "cl_contact", "cl_tel", "cl_niu", "cl_adresse"]
+      .forEach(i => document.getElementById(i).value = "");
+    listerClients();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function listerClients() {
+  try {
+    const liste = await DML.api("/api/v1/referentiel/clients");
+    document.getElementById("table-clients").innerHTML = liste.length ? `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>Code</th><th>Raison sociale</th><th>Contact</th>
+          <th>Téléphone</th><th>Livraison</th></tr></thead>
+        <tbody>${liste.map(c => `<tr>
+          <td>${c.code}</td><td>${c.raison_sociale}</td>
+          <td>${c.contact_principal || "—"}</td><td>${c.telephone || "—"}</td>
+          <td>${c.adresse_livraison || c.ville || "—"}</td>
+        </tr>`).join("")}</tbody></table></div>`
+      : '<div class="vide">Aucun client enregistré.</div>';
+  } catch (e) {
+    document.getElementById("table-clients").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
 }
 
 charger();

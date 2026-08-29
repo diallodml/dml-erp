@@ -458,3 +458,67 @@ def creer_prestataire(
     db.commit()
     db.refresh(p)
     return {"id": str(p.id), "code": p.code, "nom": p.nom, "magasin": mag.nom}
+
+
+# ---------------------------------------------------------------------------
+# CLIENTS INDUSTRIELS
+# ---------------------------------------------------------------------------
+class ClientCreer(BaseModel):
+    code: str = Field(max_length=30)
+    raison_sociale: str = Field(max_length=200)
+    adresse_livraison: Optional[str] = Field(default=None, max_length=255)
+    ville: str = Field(default="Douala", max_length=80)
+    telephone: Optional[str] = Field(default=None, max_length=30)
+    email: Optional[str] = Field(default=None, max_length=180)
+    niu: Optional[str] = Field(default=None, max_length=30)
+    contact_principal: Optional[str] = Field(default=None, max_length=150)
+    type_client: str = "INDUSTRIEL"
+
+
+@router.post("/clients", status_code=201,
+             dependencies=[Depends(exiger_permission("referentiel.client.creer"))])
+def creer_client(
+    donnees: ClientCreer,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    from app.models import Client
+
+    if db.query(Client).filter(Client.code == donnees.code).first():
+        raise HTTPException(status_code=400, detail=f"Le code {donnees.code} existe deja")
+
+    from app.models.enums import TypeClient
+
+    donnees_dict = donnees.model_dump()
+    try:
+        donnees_dict["type_client"] = TypeClient(donnees_dict["type_client"])
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Type de client inconnu")
+
+    c = Client(**donnees_dict)
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return {"id": str(c.id), "code": c.code, "raison_sociale": c.raison_sociale}
+
+
+@router.get("/clients",
+            dependencies=[Depends(exiger_permission("referentiel.client.lire"))])
+def lister_clients(
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    from app.models import Client
+
+    return [
+        {
+            "id": str(c.id),
+            "code": c.code,
+            "raison_sociale": c.raison_sociale,
+            "adresse_livraison": c.adresse_livraison,
+            "ville": c.ville,
+            "telephone": c.telephone,
+            "contact_principal": c.contact_principal,
+        }
+        for c in db.query(Client).order_by(Client.raison_sociale).all()
+    ]

@@ -443,6 +443,7 @@ class MouvementStock(DocumentModel):
     )
     motif: Mapped[Optional[str]] = mapped_column(Text)
     reference_externe: Mapped[Optional[str]] = mapped_column(String(80))
+    observations: Mapped[Optional[str]] = mapped_column(Text)
     is_valide: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     valide_par_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("utilisateurs.id", ondelete="SET NULL")

@@ -33,7 +33,27 @@
         </div>
         <div>
           <label for="l_client">Client</label>
-          <input id="l_client" type="text" placeholder="Brasserie du Littoral">
+          <select id="l_client" onchange="majAdresse()"></select>
+        </div>
+        <div>
+          <label for="l_lieu">Lieu de livraison
+            <span class="aide" id="adresse-info">adresse du client</span>
+          </label>
+          <input id="l_lieu" type="text" maxlength="255">
+        </div>
+        <div>
+          <label for="l_transporteur">Transporteur
+            <span class="aide">nom du chauffeur</span>
+          </label>
+          <input id="l_transporteur" type="text" maxlength="150">
+        </div>
+        <div>
+          <label for="l_immat">Immatriculation</label>
+          <input id="l_immat" type="text" maxlength="30">
+        </div>
+        <div>
+          <label for="l_tel_chauffeur">Téléphone chauffeur</label>
+          <input id="l_tel_chauffeur" type="tel" maxlength="30">
         </div>
         <div>
           <label for="l_date">Date de livraison</label>
@@ -80,7 +100,7 @@
 if (DML.exigerSession()) DML.barre("/vente");
 
 const PEUT_PAYER = DML.peut("vente.reversement.payer");
-let LOTS = [];
+let LOTS = [], CLIENTS = [];
 
 document.querySelectorAll('[role="tab"]').forEach(b => {
   b.addEventListener("click", () => {
@@ -96,12 +116,30 @@ document.querySelectorAll('[role="tab"]').forEach(b => {
 async function charger() {
   document.getElementById("l_date").value = new Date().toISOString().slice(0, 16);
   try {
+    CLIENTS = await DML.api("/api/v1/referentiel/clients");
+    document.getElementById("l_client").innerHTML = CLIENTS.length
+      ? CLIENTS.map(c => `<option value="${c.id}">${c.raison_sociale}</option>`).join("")
+      : '<option value="">Aucun client — créez-en un</option>';
+    majAdresse();
+
     LOTS = await DML.api("/api/v1/vente/lots");
     document.getElementById("l_lot").innerHTML = LOTS.length
       ? LOTS.map(l => `<option value="${l.id}">${l.nom}</option>`).join("")
       : '<option value="">Aucun lot en stock</option>';
     majDisponible();
   } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function clientChoisi() {
+  return CLIENTS.find(c => c.id === document.getElementById("l_client").value);
+}
+
+function majAdresse() {
+  const c = clientChoisi();
+  if (!c) return;
+  document.getElementById("l_lieu").value = c.adresse_livraison || c.ville || "";
+  document.getElementById("adresse-info").textContent =
+    c.contact_principal ? "contact : " + c.contact_principal : "adresse du client";
 }
 
 function lotChoisi() {
@@ -137,6 +175,20 @@ function majApercu() {
     : `Coût de la marchandise : <strong>${DML.fcfa(cout)}</strong> (${lot.cout_unitaire} F/kg)`;
 }
 
+async function ouvrirDoc(url) {
+  try {
+    const r = await fetch(url, {
+      headers: { "Authorization": "Bearer " + DML.jeton() },
+    });
+    if (!r.ok) throw new Error("Document indisponible");
+    const html = await r.text();
+    const blob = new Blob([html], { type: "text/html" });
+    const u = URL.createObjectURL(blob);
+    const f = window.open(u, "_blank");
+    if (!f) location.href = u;
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
 async function livrer() {
   DML.cacherMessage("msg");
   const lot = lotChoisi();
@@ -149,7 +201,12 @@ async function livrer() {
         date_livraison: document.getElementById("l_date").value + ":00Z",
         quantite_kg: Number(document.getElementById("l_qte").value),
         montant_vente: Number(document.getElementById("l_montant").value),
-        client_nom: document.getElementById("l_client").value || null,
+        client_id: clientChoisi() ? clientChoisi().id : null,
+        client_nom: clientChoisi() ? clientChoisi().raison_sociale : null,
+        lieu_livraison: document.getElementById("l_lieu").value.trim() || null,
+        transporteur: document.getElementById("l_transporteur").value.trim() || null,
+        immatriculation: document.getElementById("l_immat").value.trim() || null,
+        telephone_chauffeur: document.getElementById("l_tel_chauffeur").value.trim() || null,
         frais_deduits: Number(document.getElementById("l_frais").value) || 0,
       }),
     });
@@ -172,6 +229,11 @@ function afficherResultat(r) {
         Marge brute sur ${DML.kg(r.quantite_livree_kg)} livrés.
         Reste en magasin : <strong>${DML.kg(r.reste_en_stock_kg)}</strong>.
       </div>
+      ${r.mouvement_id ? `
+      <div class="actions">
+        <button class="bouton secondaire" onclick="ouvrirDoc('/api/v1/vente/livraisons/${r.mouvement_id}/bon')">
+          Imprimer le bon de livraison</button>
+      </div>` : ""}
       ${rev ? `
       <div class="cartes" style="margin-top:16px">
         <div class="carte"><span class="etiquette">Part DML</span>

@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,12 @@ class LivraisonCreer(BaseModel):
     date_livraison: datetime
     quantite_kg: Decimal = Field(gt=0)
     montant_vente: Decimal = Field(ge=0)
-    client_nom: Optional[str] = Field(default=None, max_length=180)
+    client_nom: Optional[str] = Field(default=None, max_length=200)
+    client_id: Optional[UUID] = None
+    lieu_livraison: Optional[str] = Field(default=None, max_length=255)
+    transporteur: Optional[str] = Field(default=None, max_length=150)
+    immatriculation: Optional[str] = Field(default=None, max_length=30)
+    telephone_chauffeur: Optional[str] = Field(default=None, max_length=30)
     frais_deduits: Optional[Decimal] = Field(default=None, ge=0)
     avance_compensee: Optional[Decimal] = Field(default=None, ge=0)
     date_echeance: Optional[date] = None
@@ -110,3 +115,66 @@ def lots_disponibles(
         }
         for lot, produit, magasin, collecteur in lignes
     ]
+
+
+@router.get("/livraisons/{mouvement_id}/bon", include_in_schema=False)
+def bon_livraison(
+    mouvement_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Bon de livraison, a faire signer par le destinataire."""
+    import base64
+    import pathlib
+
+    from fastapi.templating import Jinja2Templates
+
+    from app.core.entreprise import ENTREPRISE
+    from app.models import Lot, Magasin, MouvementStock, Produit
+
+    m = db.get(MouvementStock, mouvement_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Livraison introuvable")
+
+    lot = db.get(Lot, m.lot_id) if m.lot_id else None
+    produit = db.get(Produit, m.produit_id)
+    magasin = db.get(Magasin, m.magasin_source_id) if m.magasin_source_id else None
+
+    logo = ""
+    chemin = pathlib.Path("app/static/logo.jpeg")
+    if chemin.exists():
+        logo = "data:image/jpeg;base64," + base64.b64encode(chemin.read_bytes()).decode()
+
+    def fmt(v, dec=0):
+        if v is None:
+            return "—"
+        return f"{float(v):,.{dec}f}".replace(",", " ").replace(".", ",")
+
+    # client | lieu | transporteur | immatriculation | telephone
+    champs = (m.observations or "").split("|")
+    while len(champs) < 5:
+        champs.append("")
+    livraison = {
+        "client": champs[0] or "—",
+        "lieu": champs[1] or "—",
+        "transporteur": champs[2] or "—",
+        "immatriculation": champs[3] or "—",
+        "telephone": champs[4] or "",
+    }
+
+    templates = Jinja2Templates(directory="app/templates")
+    return templates.TemplateResponse(
+        request,
+        "bon_livraison.html",
+        {
+            "e": ENTREPRISE,
+            "logo": logo,
+            "l": livraison,
+            "m": m,
+            "lot": lot,
+            "produit": produit,
+            "magasin": magasin,
+            "fmt": fmt,
+        },
+    )

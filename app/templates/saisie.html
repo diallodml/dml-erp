@@ -44,6 +44,12 @@
           <input id="a_montant" type="number" min="1" step="1000">
         </div>
         <div>
+          <label for="a_compte">Caisse ou compte
+            <span class="aide" id="solde-caisse">d'où sort l'argent</span>
+          </label>
+          <select id="a_compte" onchange="majSoldeCaisse()"></select>
+        </div>
+        <div>
           <label for="a_mode">Mode</label>
           <select id="a_mode">
             <option value="ESPECES">Espèces</option>
@@ -227,6 +233,14 @@ async function charger() {
   document.getElementById("r_date").value = new Date().toISOString().slice(0, 16);
 
   try {
+    const comptes = await DML.api("/api/v1/tresorerie/comptes");
+    window.COMPTES = comptes;
+    document.getElementById("a_compte").innerHTML =
+      '<option value="">— sans mouvement de caisse —</option>' +
+      comptes.map(c => `<option value="${c.id}">${c.libelle} (${DML.fcfa(c.solde)})</option>`).join("");
+  } catch (e) { /* l'utilisateur n'a peut-etre pas acces a la tresorerie */ }
+
+  try {
     REFS = await DML.api("/api/v1/collecte/referentiels");
     remplir("a_collecteur", REFS.collecteurs);
     remplir("c_collecteur", REFS.collecteurs);
@@ -304,6 +318,14 @@ async function ouvrirRecu(id) {
   } catch (e) { DML.message("msg", e.message, "erreur"); }
 }
 
+function majSoldeCaisse() {
+  const id = document.getElementById("a_compte").value;
+  const c = (window.COMPTES || []).find(x => x.id === id);
+  document.getElementById("solde-caisse").textContent = c
+    ? `contient ${DML.fcfa(c.solde)}`
+    : "d'où sort l'argent";
+}
+
 async function enregistrerAvance() {
   DML.cacherMessage("msg");
   try {
@@ -314,6 +336,8 @@ async function enregistrerAvance() {
         date_remise: document.getElementById("a_date").value,
         montant_remis: Number(document.getElementById("a_montant").value),
         mode_remise: document.getElementById("a_mode").value,
+        compte_tresorerie_id: document.getElementById("a_compte").value || null,
+        compte_tresorerie_id: document.getElementById("a_compte").value || null,
         objet: document.getElementById("a_objet").value || null,
       }),
     });

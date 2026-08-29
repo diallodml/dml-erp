@@ -89,6 +89,45 @@ def creer_avance(
         created_by_id=utilisateur.id,
     )
     db.add(avance)
+    db.flush()
+
+    # L'argent sort reellement d'une caisse
+    if donnees.compte_tresorerie_id:
+        from app.models import CompteTresorerie, MouvementTresorerie
+        from app.models.enums import SensTresorerie, TypeCompteTresorerie
+
+        compte = db.get(CompteTresorerie, donnees.compte_tresorerie_id)
+        if compte is None:
+            raise ValueError("Compte de tresorerie introuvable")
+
+        sans_decouvert = {
+            TypeCompteTresorerie.CAISSE,
+            TypeCompteTresorerie.COFFRE,
+            TypeCompteTresorerie.MOBILE_MONEY,
+        }
+        if compte.type_compte in sans_decouvert and donnees.montant_remis > compte.solde_actuel:
+            raise ValueError(
+                f"Solde insuffisant : {compte.libelle} contient {compte.solde_actuel} F"
+            )
+
+        mvt = MouvementTresorerie(
+            numero=prochain_numero(db, MouvementTresorerie, "TRS"),
+            compte_tresorerie_id=compte.id,
+            date_mouvement=donnees.date_remise,
+            sens=SensTresorerie.DECAISSEMENT,
+            montant=donnees.montant_remis,
+            libelle=f"Avance {avance.numero} — {collecteur.nom}",
+            tiroir=compte.tiroir,
+            mode_reglement=donnees.mode_remise,
+            beneficiaire=collecteur.nom,
+            created_by_id=utilisateur.id,
+        )
+        db.add(mvt)
+        db.flush()
+        avance.mouvement_tresorerie_id = mvt.id
+        compte.solde_actuel = compte.solde_actuel - donnees.montant_remis
+        compte.solde_theorique = compte.solde_theorique - donnees.montant_remis
+
     db.commit()
     db.refresh(avance)
     return avance

@@ -22,14 +22,46 @@ def login(
         .first()
     )
 
+    from datetime import datetime, timedelta, timezone
+
+    MAX_TENTATIVES = 5
+    DUREE_BLOCAGE = 15  # minutes
+
+    maintenant = datetime.now(timezone.utc)
+
+    if utilisateur is not None and utilisateur.bloque_jusqua:
+        blocage = utilisateur.bloque_jusqua
+        if blocage.tzinfo is None:
+            blocage = blocage.replace(tzinfo=timezone.utc)
+        if blocage > maintenant:
+            restant = int((blocage - maintenant).total_seconds() / 60) + 1
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Compte bloque apres {MAX_TENTATIVES} tentatives. "
+                    f"Reessayez dans {restant} minute(s), ou demandez a la direction."
+                ),
+            )
+        utilisateur.tentatives_echouees = 0
+        utilisateur.bloque_jusqua = None
+
     if utilisateur is None or not verifier_mot_de_passe(
         donnees.password, utilisateur.mot_de_passe_hash
     ):
+        if utilisateur is not None:
+            utilisateur.tentatives_echouees = (utilisateur.tentatives_echouees or 0) + 1
+            if utilisateur.tentatives_echouees >= MAX_TENTATIVES:
+                utilisateur.bloque_jusqua = maintenant + timedelta(minutes=DUREE_BLOCAGE)
+            db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identifiant ou mot de passe incorrect",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    utilisateur.tentatives_echouees = 0
+    utilisateur.bloque_jusqua = None
+    db.commit()
 
     if not utilisateur.is_actif:
         raise HTTPException(

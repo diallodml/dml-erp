@@ -157,6 +157,8 @@ class Utilisateur(BaseModel):
     is_actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     doit_changer_mdp: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    tentatives_echouees: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bloque_jusqua: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     mfa_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[Optional[str]] = mapped_column(String(64))
 

@@ -47,6 +47,8 @@ def lister(
             "is_superadmin": u.is_superadmin,
             "doit_changer_mdp": u.doit_changer_mdp,
             "roles": [r.code for r in u.roles],
+            "bloque": u.bloque_jusqua is not None,
+            "tentatives": u.tentatives_echouees or 0,
         }
         for u in db.query(Utilisateur).order_by(Utilisateur.login).all()
     ]
@@ -168,3 +170,20 @@ def basculer_activation(
     u.is_actif = not u.is_actif
     db.commit()
     return {"login": u.login, "is_actif": u.is_actif}
+
+
+@router.patch("/{utilisateur_id}/debloquer",
+              dependencies=[Depends(exiger_permission("securite.utilisateur.creer"))])
+def debloquer(
+    utilisateur_id: UUID,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Leve un blocage sans attendre les 15 minutes."""
+    u = db.get(Utilisateur, utilisateur_id)
+    if u is None:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    u.tentatives_echouees = 0
+    u.bloque_jusqua = None
+    db.commit()
+    return {"login": u.login, "message": "Compte debloque"}

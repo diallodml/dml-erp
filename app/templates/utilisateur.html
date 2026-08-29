@@ -120,8 +120,8 @@ async function lister() {
           <th>Téléphone</th><th></th>
         </tr></thead>
         <tbody>${liste.map(u => `<tr>
-          <td><span class="puce ${u.is_actif ? "actif" : "inactif"}">
-            ${u.is_actif ? "Actif" : "Coupé"}</span></td>
+          <td><span class="puce ${u.bloque ? "inactif" : (u.is_actif ? "actif" : "inactif")}">
+            ${u.bloque ? "Bloqué" : (u.is_actif ? "Actif" : "Coupé")}</span></td>
           <td>${u.login}</td>
           <td>${u.nom_affichage}${u.is_superadmin ? " · direction" : ""}</td>
           <td>${u.roles.join(", ") || (u.is_superadmin ? "tous droits" : "aucun")}</td>
@@ -129,6 +129,8 @@ async function lister() {
           <td><div class="actions-ligne">
             <button class="bouton secondaire"
               onclick="reinit('${u.id}','${u.login}')">Mot de passe</button>
+            ${u.bloque ? `<button class="bouton secondaire"
+              onclick="debloquer('${u.id}','${u.login}')">Débloquer</button>` : ""}
             ${u.is_superadmin ? "" : `<button class="bouton secondaire"
               onclick="basculer('${u.id}','${u.login}')">${u.is_actif ? "Couper" : "Rouvrir"}</button>`}
           </div></td>
@@ -174,6 +176,14 @@ async function creer() {
       `il devra le changer.`, "ok");
     ["u_login", "u_nom", "u_mdp", "u_tel"].forEach(i => document.getElementById(i).value = "");
     document.querySelectorAll("#roles input:checked").forEach(i => i.checked = false);
+    lister();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function debloquer(id, login) {
+  try {
+    await DML.api(`/api/v1/utilisateurs/${id}/debloquer`, { method: "PATCH" });
+    DML.message("msg", `Compte de ${login} débloqué.`, "ok");
     lister();
   } catch (e) { DML.message("msg", e.message, "erreur"); }
 }

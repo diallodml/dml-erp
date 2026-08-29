@@ -38,8 +38,10 @@ const DML = {
     const p = DML.profil() || {};
     const liens = [];
     if (DML.peut("collecte.ecart.lire") || DML.peut("collecte.stock.lire"))
-      liens.push(["/tableau", "Tableau de bord"]);
+      liens.push(["/tableau", "Bord"]);
     liens.push(["/saisie", "Saisie"]);
+    if (DML.peut("collecte.collecte.lire"))
+      liens.push(["/collectes", "Collectes"]);
     if (DML.peut("collecte.stock.lire"))
       liens.push(["/magasin", "Magasin"]);
     if (DML.peut("traitement.expedier"))
@@ -47,11 +49,11 @@ const DML = {
     if (DML.peut("vente.livraison.creer"))
       liens.push(["/vente", "Livraisons"]);
     if (DML.peut("tresorerie.lire"))
-      liens.push(["/tresorerie", "Trésorerie"]);
+      liens.push(["/tresorerie", "Caisse"]);
     if (DML.peut("securite.utilisateur.creer"))
       liens.push(["/utilisateurs", "Comptes"]);
     if (DML.peut("referentiel.collecteur.creer"))
-      liens.push(["/referentiel", "Collecteurs"]);
+      liens.push(["/referentiel", "Référentiels"]);
     if (DML.peut("referentiel.collecteur.lire"))
       liens.push(["/collecteur", "Fiches"]);
 

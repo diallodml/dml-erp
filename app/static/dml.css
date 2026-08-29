@@ -27,14 +27,17 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
   padding:12px 20px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;
 }
 .barre .marque{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:-.02em}
-.barre nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.barre nav{
+  display:flex;gap:2px;margin-left:auto;flex-wrap:wrap;
+  max-width:100%;
+}
 .barre nav a{
-  color:var(--sisal-2);text-decoration:none;font-size:14px;
-  padding:6px 12px;border-radius:2px;
+  color:var(--sisal-2);text-decoration:none;font-size:13px;
+  padding:5px 9px;border-radius:2px;white-space:nowrap;
 }
 .barre nav a:hover{background:var(--encre-2)}
 .barre nav a[aria-current="page"]{background:var(--mais);color:var(--encre);font-weight:600}
-.qui{font-family:var(--data);font-size:12px;color:var(--trait);display:flex;align-items:center;gap:8px}
+.qui{font-family:var(--data);font-size:11.5px;color:var(--trait);display:flex;align-items:center;gap:7px;flex-shrink:0}
 .qui b{color:var(--sisal-2);font-weight:500}
 .badge-role{
   background:var(--encre-2);border:1px solid #3A5145;color:var(--trait);

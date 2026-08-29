@@ -76,3 +76,8 @@ def page_utilisateurs(request: Request):
 @app.get("/tresorerie", response_class=HTMLResponse, include_in_schema=False)
 def page_tresorerie(request: Request):
     return templates.TemplateResponse(request, "tresorerie.html")
+
+
+@app.get("/collectes", response_class=HTMLResponse, include_in_schema=False)
+def page_collectes(request: Request):
+    return templates.TemplateResponse(request, "collectes.html")

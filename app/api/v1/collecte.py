@@ -216,6 +216,64 @@ def liste_collectes(
     ]
 
 
+@router.get("/liste",
+            dependencies=[Depends(exiger_permission("collecte.collecte.lire"))])
+def liste_complete(
+    statut: Optional[str] = Query(default=None),
+    collecteur_id: Optional[UUID] = Query(default=None),
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """
+    Toutes les collectes, de la plus recente a la plus ancienne.
+
+    Repond a : qu'est-ce qui est parti et n'est pas revenu ?
+    """
+    from app.models import Collecteur, Lot, Magasin, ZoneCollecte
+
+    q = (
+        db.query(Collecte, Collecteur.nom, ZoneCollecte.libelle, Magasin.nom)
+        .join(Collecteur, Collecteur.id == Collecte.collecteur_id)
+        .outerjoin(ZoneCollecte, ZoneCollecte.id == Collecte.zone_id)
+        .outerjoin(Magasin, Magasin.id == Collecte.magasin_destination_id)
+    )
+    if statut:
+        q = q.filter(Collecte.statut == statut)
+    if collecteur_id:
+        q = q.filter(Collecte.collecteur_id == collecteur_id)
+
+    lignes = q.order_by(Collecte.numero.desc()).limit(200).all()
+
+    # Quelles collectes ont deja produit un lot ?
+    avec_lot = {
+        row[0]
+        for row in db.query(Lot.collecte_id).filter(Lot.collecte_id.isnot(None)).all()
+    }
+
+    return [
+        {
+            "id": str(c.id),
+            "numero": c.numero,
+            "date_debut": c.date_debut,
+            "collecteur": collecteur,
+            "marche": zone or "—",
+            "magasin": magasin,
+            "statut": c.statut.value,
+            "mode_detention": c.mode_detention.value,
+            "nombre_sacs": c.nombre_sacs_total,
+            "poids_theorique_kg": c.poids_theorique_kg,
+            "poids_reel_kg": c.poids_reel_kg,
+            "ecart_poids_kg": c.ecart_poids_kg,
+            "montant": c.montant_achat_total,
+            "frais": c.frais_annexes,
+            "humidite": c.taux_humidite_magasin,
+            "date_reception": c.date_reception_magasin,
+            "en_stock": c.id in avec_lot,
+        }
+        for c, collecteur, zone, magasin in lignes
+    ]
+
+
 @router.get("/{collecte_id}", response_model=CollecteLire,
             dependencies=[Depends(exiger_permission("collecte.collecte.lire"))])
 def lire_collecte(
@@ -305,3 +363,5 @@ def lots_en_magasin(
     ordre = {"URGENCE": 0, "CRITIQUE": 1, "ATTENTION": 2, "INFO": 3}
     resultats.sort(key=lambda r: (ordre[r["risque"]], -(r["age_jours"] or 0)))
     return resultats
+
+

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collectes — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dml.css?v=3">
+<style>
+  .puce{
+    display:inline-block;padding:2px 9px;font-family:var(--data);
+    font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;border:1px solid;
+  }
+  .puce.encours    {background:rgba(232,163,23,.20);border-color:#B07B0C;color:#7A5507}
+  .puce.receptionnee{background:rgba(47,107,79,.14);border-color:var(--gain);color:var(--gain)}
+  .puce.stock      {background:var(--encre);border-color:var(--encre);color:var(--sisal-2)}
+  .puce.autre      {background:none;border-color:var(--trait);color:var(--texte-doux)}
+  .filtres{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .filtres button{
+    background:var(--sisal-2);border:1px solid var(--trait);color:var(--texte-doux);
+    padding:7px 14px;font-family:var(--corps);font-size:13.5px;cursor:pointer;
+  }
+  .filtres button[aria-pressed="true"]{
+    background:var(--encre);border-color:var(--encre);color:var(--sisal-2);font-weight:600;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Collectes</h1>
+    <p>Ce qui est parti au marché, ce qui est arrivé, ce qui n'est pas encore entré en stock.</p>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <section id="resume"></section>
+
+  <section>
+    <h2>Toutes les collectes</h2>
+    <div class="filtres">
+      <button data-filtre="tous" aria-pressed="true">Toutes</button>
+      <button data-filtre="EN_COURS" aria-pressed="false">En cours</button>
+      <button data-filtre="RECEPTIONNEE" aria-pressed="false">Réceptionnées</button>
+      <button data-filtre="attente" aria-pressed="false">Pas encore en stock</button>
+    </div>
+    <div id="table-collectes"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js?v=3"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/collectes");
+
+let COLLECTES = [], FILTRE = "tous";
+
+const STATUTS = {
+  EN_COURS: "En cours",
+  CLOTUREE: "Clôturée",
+  EXPEDIEE: "Expédiée",
+  RECEPTIONNEE: "Reçue",
+  ANNULEE: "Annulée",
+};
+
+document.querySelectorAll(".filtres button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".filtres button")
+      .forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+    FILTRE = b.dataset.filtre;
+    afficher();
+  });
+});
+
+async function charger() {
+  try {
+    COLLECTES = await DML.api("/api/v1/collecte/liste");
+    resume();
+    afficher();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function resume() {
+  const enCours = COLLECTES.filter(c => c.statut === "EN_COURS");
+  const attente = COLLECTES.filter(c => c.statut === "RECEPTIONNEE" && !c.en_stock);
+  const montantEnCours = enCours.reduce((s, c) => s + Number(c.montant || 0), 0);
+  const tonnesAttente = attente.reduce((s, c) => s + Number(c.poids_reel_kg || 0), 0) / 1000;
+
+  document.getElementById("resume").innerHTML = `
+    <div class="cartes">
+      <div class="carte">
+        <span class="etiquette">Collectes ouvertes</span>
+        <div class="valeur">${enCours.length}</div>
+        <div class="note">${DML.fcfa(montantEnCours)} déjà engagés</div>
+      </div>
+      <div class="carte">
+        <span class="etiquette">Reçues, pas en stock</span>
+        <div class="valeur ${attente.length ? "alerte" : ""}">${attente.length}</div>
+        <div class="note">${attente.length ? DML.tonnes(tonnesAttente) + " en attente" : "rien en attente"}</div>
+      </div>
+      <div class="carte">
+        <span class="etiquette">Total enregistré</span>
+        <div class="valeur">${COLLECTES.length}</div>
+      </div>
+    </div>`;
+}
+
+function afficher() {
+  let liste = COLLECTES;
+  if (FILTRE === "attente")
+    liste = COLLECTES.filter(c => c.statut === "RECEPTIONNEE" && !c.en_stock);
+  else if (FILTRE !== "tous")
+    liste = COLLECTES.filter(c => c.statut === FILTRE);
+
+  if (!liste.length) {
+    document.getElementById("table-collectes").innerHTML =
+      `<div class="vide">${FILTRE === "tous"
+        ? "Aucune collecte enregistrée."
+        : "Aucune collecte dans cette catégorie."}</div>`;
+    return;
+  }
+
+  document.getElementById("table-collectes").innerHTML = `
+    <div class="enveloppe-table"><table>
+      <thead><tr>
+        <th>État</th><th>Pièce</th><th>Date</th><th>Collecteur</th><th>Marché</th>
+        <th>Sacs</th><th>Payé</th><th>Reçu</th><th>Écart</th>
+        <th>Humidité</th><th>Montant</th>
+      </tr></thead>
+      <tbody>${liste.map(c => `<tr>
+        <td><span class="puce ${classe(c)}">${etiquette(c)}</span></td>
+        <td>${c.numero}</td>
+        <td>${c.date_debut || "—"}</td>
+        <td>${c.collecteur}</td>
+        <td>${c.marche}</td>
+        <td class="num">${c.nombre_sacs || 0}</td>
+        <td class="num">${DML.kg(c.poids_theorique_kg)}</td>
+        <td class="num">${c.poids_reel_kg != null ? DML.kg(c.poids_reel_kg) : "—"}</td>
+        <td class="num ${Number(c.ecart_poids_kg) < 0 ? "negatif" : ""}">
+          ${c.ecart_poids_kg != null ? DML.kg(c.ecart_poids_kg) : "—"}</td>
+        <td class="num">${c.humidite != null ? c.humidite + " %" : "—"}</td>
+        <td class="num">${DML.fcfa(c.montant)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+function classe(c) {
+  if (c.en_stock) return "stock";
+  if (c.statut === "EN_COURS") return "encours";
+  if (c.statut === "RECEPTIONNEE") return "receptionnee";
+  return "autre";
+}
+
+function etiquette(c) {
+  if (c.en_stock) return "En stock";
+  if (c.statut === "RECEPTIONNEE") return "À entrer";
+  return STATUTS[c.statut] || c.statut;
+}
+
+charger();
+</script>
+</body>
+</html>

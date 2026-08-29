@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.api.v1 import auth, collecte, referentiel, traitement, tresorerie, utilisateur, vente
+from app.api.v1 import annulation, auth, collecte, referentiel, traitement, tresorerie, utilisateur, vente
 
 app = FastAPI(
     title="ERP DML SARL",
@@ -15,6 +15,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 app.include_router(auth.router)
+app.include_router(annulation.router)
 app.include_router(collecte.router)
 app.include_router(referentiel.router)
 app.include_router(vente.router)

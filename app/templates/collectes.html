@@ -22,6 +22,8 @@
     background:var(--sisal-2);border:1px solid var(--trait);color:var(--texte-doux);
     padding:7px 14px;font-family:var(--corps);font-size:13.5px;cursor:pointer;
   }
+  .actions-ligne{display:flex;gap:4px;flex-wrap:wrap}
+  .actions-ligne button{padding:4px 9px;font-size:12px;white-space:nowrap}
   .filtres button[aria-pressed="true"]{
     background:var(--encre);border-color:var(--encre);color:var(--sisal-2);font-weight:600;
   }
@@ -127,7 +129,7 @@ function afficher() {
       <thead><tr>
         <th>État</th><th>Pièce</th><th>Date</th><th>Collecteur</th><th>Marché</th>
         <th>Sacs</th><th>Payé</th><th>Reçu</th><th>Écart</th>
-        <th>Humidité</th><th>Montant</th>
+        <th>Humidité</th><th>Montant</th><th></th>
       </tr></thead>
       <tbody>${liste.map(c => `<tr>
         <td><span class="puce ${classe(c)}">${etiquette(c)}</span></td>
@@ -142,6 +144,7 @@ function afficher() {
           ${c.ecart_poids_kg != null ? DML.kg(c.ecart_poids_kg) : "—"}</td>
         <td class="num">${c.humidite != null ? c.humidite + " %" : "—"}</td>
         <td class="num">${DML.fcfa(c.montant)}</td>
+        <td><div class="actions-ligne">${actions(c)}</div></td>
       </tr>`).join("")}</tbody>
     </table></div>`;
 }
@@ -157,6 +160,51 @@ function etiquette(c) {
   if (c.en_stock) return "En stock";
   if (c.statut === "RECEPTIONNEE") return "À entrer";
   return STATUTS[c.statut] || c.statut;
+}
+
+function actions(c) {
+  const b = [];
+  if (c.statut === "EN_COURS")
+    b.push(`<button class="bouton secondaire" onclick="voirLignes('${c.id}','${c.numero}')">Achats</button>`);
+  if (c.statut === "RECEPTIONNEE" && !c.en_stock)
+    b.push(`<button class="bouton secondaire" onclick="annulerReception('${c.id}','${c.numero}')">Annuler pesée</button>`);
+  return b.join(" ");
+}
+
+async function voirLignes(id, numero) {
+  try {
+    const lignes = await DML.api(`/api/v1/annulation/lignes/${id}`);
+    if (!lignes.length) { DML.message("msg", `Aucun achat saisi sur ${numero}.`, "ok"); return; }
+    const liste = lignes.map(l =>
+      `${l.numero_ligne}. ${l.produit} — ${l.nombre_sacs} sacs — ${DML.fcfa(l.montant)}`
+    ).join("\n");
+    const choix = prompt(
+      `Achats de ${numero} :\n\n${liste}\n\nNuméro de la ligne à supprimer (vide pour annuler) :`
+    );
+    if (!choix) return;
+    const ligne = lignes.find(l => String(l.numero_ligne) === choix.trim());
+    if (!ligne) { DML.message("msg", "Numéro de ligne inconnu.", "erreur"); return; }
+    const motif = prompt("Motif de la suppression (5 caractères minimum) :");
+    if (!motif) return;
+    const r = await DML.api(`/api/v1/annulation/lignes/${ligne.id}`, {
+      method: "POST", body: JSON.stringify({ motif }),
+    });
+    DML.message("msg",
+      `${r.message}. Nouveau total : ${DML.fcfa(r.nouveau_total)} pour ${r.nouveaux_sacs} sacs.`, "ok");
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function annulerReception(id, numero) {
+  const motif = prompt(`Annuler la pesée de ${numero} ?\n\nMotif (5 caractères minimum) :`);
+  if (!motif) return;
+  try {
+    const r = await DML.api(`/api/v1/annulation/receptions/${id}`, {
+      method: "POST", body: JSON.stringify({ motif }),
+    });
+    DML.message("msg", `${r.numero} — ${r.message}.`, "ok");
+    charger();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
 }
 
 charger();

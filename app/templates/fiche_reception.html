@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Fiche de réception {{ c.numero }}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm; }
+  *{box-sizing:border-box}
+  body{font-family:"Inter",sans-serif;color:#14261F;margin:0;padding:24px;background:#E6E8E1}
+  .feuille{max-width:190mm;margin:0 auto;background:#fff;padding:24px 28px;border:1px solid #C3C8BC}
+  .entete{display:flex;gap:16px;align-items:flex-start;border-bottom:2px solid #14261F;padding-bottom:12px}
+  .entete img{width:66px;height:66px;object-fit:contain}
+  .entete .raison{font-size:19px;line-height:1.15;font-weight:700;color:#2F6B4F}
+  .entete .activite{font-size:12px;color:#5A6B60;margin-top:2px}
+  .entete .legal{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:#5A6B60;line-height:1.6;margin-top:5px}
+  .titre{text-align:center;margin:18px 0 4px;font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .piece{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:#5A6B60;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px}
+  th{text-align:left;padding:6px 9px;background:#F2F3EE;font-weight:600;border:1px solid #C3C8BC}
+  td{padding:6px 9px;border:1px solid #C3C8BC}
+  td.num{font-family:"IBM Plex Mono",monospace;text-align:right}
+  .infos th{width:26%}
+  .pesee{background:#14261F;color:#fff;display:flex;margin:16px 0}
+  .pesee div{flex:1;padding:12px 14px;border-right:1px solid #3A5145}
+  .pesee div:last-child{border-right:none}
+  .pesee span{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9DB0BB;margin-bottom:4px}
+  .pesee b{font-family:"IBM Plex Mono",monospace;font-size:19px}
+  .pesee b.perte{color:#E8A317}
+  .alerte{padding:10px 13px;border-left:3px solid #A8322D;background:#FBEEED;font-size:12.5px;margin-bottom:14px}
+  .signatures{display:flex;gap:26px;margin-top:26px}
+  .sign{flex:1}
+  .sign b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:46px}
+  .sign .trait{border-top:1px solid #14261F;padding-top:4px;font-size:10.5px;color:#5A6B60}
+  .pied{margin-top:22px;padding-top:9px;border-top:1px solid #C3C8BC;font-family:"IBM Plex Mono",monospace;font-size:9px;color:#5A6B60;text-align:center;line-height:1.7}
+  .imprimer{max-width:190mm;margin:0 auto 14px;text-align:right}
+  .imprimer button{background:#E8A317;border:none;padding:9px 20px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  @media print{ body{background:#fff;padding:0} .feuille{border:none;padding:0} .imprimer{display:none} }
+</style>
+</head>
+<body>
+<div class="imprimer"><button onclick="window.print()">Imprimer</button></div>
+
+<div class="feuille">
+  <div class="entete">
+    <img src="{{ logo }}" alt="">
+    <div>
+      <div class="raison">{{ e.denomination }}</div>
+      <div class="activite">{{ e.activite }}</div>
+      <div class="legal">
+        {{ e.adresse }}<br>
+        Tel. {{ e.telephone }} &nbsp;·&nbsp; {{ e.telephone_2 }}<br>
+        NIU {{ e.niu }} &nbsp;·&nbsp; RCCM {{ e.rccm }}
+      </div>
+    </div>
+  </div>
+
+  <div class="titre">Fiche de réception</div>
+  <div class="piece">N° {{ c.numero }} &nbsp;—&nbsp; Reçu le {{ c.date_reception_magasin.strftime("%d/%m/%Y à %Hh%M") if c.date_reception_magasin else "—" }}</div>
+
+  <table class="infos">
+    <tr><th>Collecteur</th><td>{{ collecteur.nom }}{% if collecteur.telephone %} — {{ collecteur.telephone }}{% endif %}</td>
+        <th>Marché</th><td>{{ zone.libelle if zone else "—" }}</td></tr>
+    <tr><th>Magasin</th><td>{{ magasin.nom if magasin else "—" }}</td>
+        <th>Collecte du</th><td>{{ c.date_debut.strftime("%d/%m/%Y") if c.date_debut else "—" }}</td></tr>
+  </table>
+
+  <table>
+    <thead><tr><th>Produit acheté</th><th>Vendeur</th><th>Sacs</th><th>Poids/sac</th><th>Prix/sac</th><th>Montant</th></tr></thead>
+    <tbody>
+      {% for l in lignes %}
+      <tr>
+        <td>{{ l.produit.designation if l.produit else "—" }}</td>
+        <td>{{ l.nom_vendeur or "—" }}</td>
+        <td class="num">{{ l.nombre_sacs or 0 }}</td>
+        <td class="num">{{ fmt(l.poids_nominal_sac_kg) }} kg</td>
+        <td class="num">{{ fmt(l.prix_unitaire) }}</td>
+        <td class="num">{{ fmt(l.montant) }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <th colspan="2">Total</th>
+        <td class="num"><strong>{{ c.nombre_sacs_total }}</strong></td>
+        <td class="num">—</td><td class="num">—</td>
+        <td class="num"><strong>{{ fmt(c.montant_achat_total) }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pesee">
+    <div><span>Poids annoncé</span><b>{{ fmt(c.poids_theorique_kg) }} kg</b></div>
+    <div><span>Poids pesé</span><b>{{ fmt(c.poids_reel_kg) }} kg</b></div>
+    <div><span>Écart</span><b class="perte">{{ fmt(c.ecart_poids_kg) }} kg</b></div>
+    <div><span>Sacs reçus / expédiés</span><b>{{ c.nombre_sacs_recus or "—" }} / {{ c.nombre_sacs_expedies or "—" }}</b></div>
+  </div>
+
+  <table class="infos">
+    <tr>
+      <th>Humidité mesurée</th><td>{{ fmt(c.taux_humidite_magasin, 1) }} %</td>
+      <th>Impuretés</th><td>{{ fmt(c.taux_impuretes_magasin, 1) }} %</td>
+    </tr>
+  </table>
+
+  {% if c.ecart_poids_kg and c.ecart_poids_kg < 0 %}
+  <div class="alerte">
+    Le poids pesé est inférieur au poids annoncé de <strong>{{ fmt(-c.ecart_poids_kg) }} kg</strong>.
+    Cet écart est constaté contradictoirement et porté à la connaissance du collecteur.
+  </div>
+  {% endif %}
+
+  <div class="signatures">
+    <div class="sign">
+      <b>Le collecteur</b>
+      <div class="trait">{{ collecteur.nom }}</div>
+    </div>
+    <div class="sign">
+      <b>Le magasinier</b>
+      <div class="trait">Nom et signature</div>
+    </div>
+    <div class="sign">
+      <b>Pour {{ e.sigle }}</b>
+      <div class="trait">Signature et cachet</div>
+    </div>
+  </div>
+
+  <div class="pied">
+    {{ e.produits }}<br>
+    {{ e.denomination }} — NIU {{ e.niu }} — RCCM {{ e.rccm }} — {{ e.centre_impots }}
+  </div>
+</div>
+</body>
+</html>

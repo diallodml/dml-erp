@@ -205,6 +205,7 @@
 
     <div id="resultat"></div>
     <div id="qualite"></div>
+    <div id="zone-fiche"></div>
     <div id="zone-stock" hidden>
       <div class="actions">
         <button class="bouton" onclick="entrerEnStock()">Entrer la marchandise en stock</button>
@@ -275,6 +276,20 @@ document.querySelectorAll('[role="tab"]').forEach(b => {
   }));
 
 // --- Actions
+async function ouvrirDoc(url) {
+  try {
+    const r = await fetch(url, {
+      headers: { "Authorization": "Bearer " + DML.jeton() },
+    });
+    if (!r.ok) throw new Error("Document indisponible");
+    const html = await r.text();
+    const blob = new Blob([html], { type: "text/html" });
+    const u = URL.createObjectURL(blob);
+    const f = window.open(u, "_blank");
+    if (!f) location.href = u;
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
 async function ouvrirRecu(id) {
   try {
     const r = await fetch(`/api/v1/collecte/avances/${id}/recu`, {
@@ -375,6 +390,9 @@ async function receptionner() {
     afficherQualite(r.alerte_qualite);
     window.DERNIERE_COLLECTE = id;
     document.getElementById("zone-stock").hidden = false;
+    document.getElementById("zone-fiche").innerHTML =
+      `<div class="actions"><button class="bouton secondaire"
+         onclick="ouvrirDoc('/api/v1/collecte/${id}/fiche')">Imprimer la fiche de réception</button></div>`;
     rafraichirCollectes();
   } catch (e) { DML.message("msg", e.message, "erreur"); }
 }

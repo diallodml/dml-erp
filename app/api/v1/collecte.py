@@ -453,3 +453,61 @@ def _en_lettres(n: int) -> str:
     if n:
         parties.append(moins_mille(n))
     return " ".join(parties)
+
+
+@router.get("/{collecte_id}/fiche", include_in_schema=False)
+def fiche_reception(
+    collecte_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    utilisateur: Utilisateur = Depends(utilisateur_courant),
+):
+    """Fiche de pesee, a signer contradictoirement a l'arrivee."""
+    import base64
+    import pathlib
+
+    from fastapi.templating import Jinja2Templates
+
+    from app.core.entreprise import ENTREPRISE
+    from app.models import Collecteur, LigneCollecte, Magasin, ZoneCollecte
+
+    c = db.get(Collecte, collecte_id)
+    if c is None:
+        raise HTTPException(status_code=404, detail="Collecte introuvable")
+
+    collecteur = db.get(Collecteur, c.collecteur_id)
+    zone = db.get(ZoneCollecte, c.zone_id) if c.zone_id else None
+    magasin = db.get(Magasin, c.magasin_destination_id) if c.magasin_destination_id else None
+
+    lignes = (
+        db.query(LigneCollecte)
+        .filter(LigneCollecte.collecte_id == c.id)
+        .order_by(LigneCollecte.numero_ligne)
+        .all()
+    )
+
+    logo = ""
+    chemin = pathlib.Path("app/static/logo.jpeg")
+    if chemin.exists():
+        logo = "data:image/jpeg;base64," + base64.b64encode(chemin.read_bytes()).decode()
+
+    def fmt(v, dec=0):
+        if v is None:
+            return "—"
+        return f"{float(v):,.{dec}f}".replace(",", " ").replace(".", ",")
+
+    templates = Jinja2Templates(directory="app/templates")
+    return templates.TemplateResponse(
+        request,
+        "fiche_reception.html",
+        {
+            "e": ENTREPRISE,
+            "logo": logo,
+            "c": c,
+            "collecteur": collecteur,
+            "zone": zone,
+            "magasin": magasin,
+            "lignes": lignes,
+            "fmt": fmt,
+        },
+    )

@@ -84,7 +84,7 @@ def ajouter_ligne(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{collecte_id}/reception", response_model=CollecteLire,
+@router.post("/{collecte_id}/reception",
              dependencies=[Depends(exiger_permission("collecte.reception.creer"))])
 def receptionner(
     collecte_id: UUID,
@@ -92,11 +92,22 @@ def receptionner(
     db: Session = Depends(get_db),
     utilisateur: Utilisateur = Depends(utilisateur_courant),
 ):
-    """Pesee a l'arrivee au magasin. Calcule l'ecart poids paye / poids recu."""
+    """Pesee a l'arrivee. Calcule l'ecart et chiffre le surcout d'humidite."""
     try:
-        return repo.receptionner(db, collecte_id, donnees, utilisateur)
+        c = repo.receptionner(db, collecte_id, donnees, utilisateur)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "id": str(c.id),
+        "numero": c.numero,
+        "statut": c.statut.value,
+        "poids_theorique_kg": c.poids_theorique_kg,
+        "poids_reel_kg": c.poids_reel_kg,
+        "ecart_poids_kg": c.ecart_poids_kg,
+        "ecart_sacs": c.ecart_sacs,
+        "taux_humidite_magasin": c.taux_humidite_magasin,
+        "alerte_qualite": getattr(c, "alerte_qualite", None),
+    }
 
 
 

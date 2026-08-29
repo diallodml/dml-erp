@@ -203,6 +203,7 @@
     </fieldset>
 
     <div id="resultat"></div>
+    <div id="qualite"></div>
     <div id="zone-stock" hidden>
       <div class="actions">
         <button class="bouton" onclick="entrerEnStock()">Entrer la marchandise en stock</button>
@@ -353,6 +354,7 @@ async function receptionner() {
       }),
     });
     afficherEcart(r);
+    afficherQualite(r.alerte_qualite);
     window.DERNIERE_COLLECTE = id;
     document.getElementById("zone-stock").hidden = false;
     rafraichirCollectes();
@@ -387,6 +389,34 @@ function afficherEcart(c) {
           <span>Reçu ${DML.kg(reel)}</span>
           <span>Payé ${DML.kg(theo)}</span>
         </div>
+      </div>
+    </div>`;
+}
+
+function afficherQualite(a) {
+  const zone = document.getElementById("qualite");
+  if (!a || !a.mesure || !a.hors_seuil) {
+    if (zone) zone.innerHTML = "";
+    return;
+  }
+  zone.innerHTML = `
+    <div class="balance" style="margin-top:16px">
+      <div class="titre">Ce que cette humidité va coûter</div>
+      <div class="chiffre negatif">${DML.fcfa(a.surcout_total)}</div>
+      <div class="sous">
+        Le lot est à <strong>${a.humidite} %</strong> au lieu de ${a.seuil} %,
+        soit ${a.ecart_points} points de trop.
+        Il perdra environ <strong>${DML.kg(a.perte_sechage_kg)}</strong> au séchage,
+        qui coûtera ${DML.fcfa(a.cout_sechage)}.
+      </div>
+      <div class="cartes" style="margin-top:16px">
+        <div class="carte"><span class="etiquette">Poids après séchage</span>
+          <div class="valeur">${DML.kg(a.poids_apres_sechage)}</div></div>
+        <div class="carte"><span class="etiquette">Coût au kilo</span>
+          <div class="valeur alerte">${a.cout_kg_apres} F</div>
+          <div class="note">au lieu de ${a.cout_kg_avant} F</div></div>
+        <div class="carte"><span class="etiquette">Surcoût par kilo</span>
+          <div class="valeur alerte">+ ${a.surcout_kg} F</div></div>
       </div>
     </div>`;
 }

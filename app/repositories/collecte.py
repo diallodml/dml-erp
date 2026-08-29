@@ -268,6 +268,23 @@ def receptionner(
 
     db.commit()
     db.refresh(collecte)
+
+    # Chiffrer le surcout si la marchandise est trop humide
+    lignes = (
+        db.query(LigneCollecte)
+        .filter(LigneCollecte.collecte_id == collecte.id)
+        .all()
+    )
+    collecte.alerte_qualite = None
+    if lignes and collecte.taux_humidite_magasin is not None:
+        collecte.alerte_qualite = evaluer_qualite(
+            db,
+            lignes[0].produit_id,
+            collecte.poids_reel_kg,
+            collecte.taux_humidite_magasin,
+            collecte.montant_achat_total + collecte.frais_annexes,
+        )
+
     return collecte
 
 
@@ -447,3 +464,78 @@ def etat_stock(db: Session, magasin_id: Optional[UUID] = None) -> List[dict]:
         }
         for l in lignes
     ]
+
+
+def evaluer_qualite(
+    db: Session,
+    produit_id: UUID,
+    poids_kg: Decimal,
+    humidite: Optional[Decimal],
+    montant_achat: Decimal,
+    prix_sechage_tonne: Decimal = Decimal("8000"),
+) -> dict:
+    """
+    Chiffre ce qu'un lot trop humide va couter.
+
+    On ne decote pas le collecteur -- DML paie le meme prix quelle que
+    soit l'humidite. Mais le surcout est reel : le grain va perdre du
+    poids au sechage, et le sechage se paie.
+
+    Cette fonction le rend visible AU MOMENT DE LA PESEE, pas trois
+    semaines plus tard.
+    """
+    from app.models import Produit
+
+    produit = db.get(Produit, produit_id)
+    seuil = (produit.taux_humidite_max if produit else None) or Decimal("14.00")
+
+    if humidite is None:
+        return {"mesure": False, "seuil": seuil}
+
+    hors_seuil = humidite > seuil
+    if not hors_seuil:
+        return {
+            "mesure": True,
+            "hors_seuil": False,
+            "humidite": humidite,
+            "seuil": seuil,
+            "message": "Humidite dans les limites du produit.",
+        }
+
+    # Perte de poids par deshydratation jusqu'au seuil
+    poids_apres = (
+        poids_kg * (Decimal("100") - humidite) / (Decimal("100") - seuil)
+    ).quantize(Decimal("0.001"))
+    perte = (poids_kg - poids_apres).quantize(Decimal("0.001"))
+
+    cout_sechage = (
+        (poids_kg / Decimal("1000")) * prix_sechage_tonne
+    ).quantize(Decimal("0.01"))
+
+    cout_avant = (montant_achat / poids_kg).quantize(Decimal("0.01")) if poids_kg else Decimal("0")
+    cout_apres = (
+        (montant_achat + cout_sechage) / poids_apres
+    ).quantize(Decimal("0.01")) if poids_apres else Decimal("0")
+    surcout_kg = (cout_apres - cout_avant).quantize(Decimal("0.01"))
+    surcout_total = (surcout_kg * poids_apres).quantize(Decimal("0.01"))
+
+    return {
+        "mesure": True,
+        "hors_seuil": True,
+        "humidite": humidite,
+        "seuil": seuil,
+        "ecart_points": (humidite - seuil).quantize(Decimal("0.01")),
+        "poids_apres_sechage": poids_apres,
+        "perte_sechage_kg": perte,
+        "cout_sechage": cout_sechage,
+        "cout_kg_avant": cout_avant,
+        "cout_kg_apres": cout_apres,
+        "surcout_kg": surcout_kg,
+        "surcout_total": surcout_total,
+        "message": (
+            f"Ce lot est a {humidite} % au lieu de {seuil} %. "
+            f"Il perdra environ {perte} kg au sechage, qui coutera "
+            f"{cout_sechage} F. Votre kilo revient a {cout_apres} F "
+            f"au lieu de {cout_avant} F."
+        ),
+    }

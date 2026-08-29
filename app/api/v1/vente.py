@@ -31,6 +31,7 @@ class LivraisonCreer(BaseModel):
     frais_deduits: Optional[Decimal] = Field(default=None, ge=0)
     avance_compensee: Optional[Decimal] = Field(default=None, ge=0)
     date_echeance: Optional[date] = None
+    compte_encaissement_id: Optional[UUID] = None
 
 
 class PaiementCreer(BaseModel):

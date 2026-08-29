@@ -211,6 +211,43 @@ def payer_reversement(
         else StatutReversement.PARTIEL
     )
     r.updated_by_id = utilisateur.id
+
+    # L'argent sort reellement d'une caisse
+    if donnees.compte_tresorerie_id:
+        from app.models import CompteTresorerie, MouvementTresorerie
+        from app.models.enums import SensTresorerie, TypeCompteTresorerie
+
+        compte = db.get(CompteTresorerie, donnees.compte_tresorerie_id)
+        if compte is None:
+            raise ValueError("Compte de tresorerie introuvable")
+
+        sans_decouvert = {
+            TypeCompteTresorerie.CAISSE,
+            TypeCompteTresorerie.COFFRE,
+            TypeCompteTresorerie.MOBILE_MONEY,
+        }
+        if compte.type_compte in sans_decouvert and montant > compte.solde_actuel:
+            raise ValueError(
+                f"Solde insuffisant : {compte.libelle} contient {compte.solde_actuel} F"
+            )
+
+        collecteur = db.get(Collecteur, r.collecteur_id)
+        mvt = MouvementTresorerie(
+            numero=prochain_numero(db, MouvementTresorerie, "TRS"),
+            compte_tresorerie_id=compte.id,
+            date_mouvement=donnees.date_paiement,
+            sens=SensTresorerie.DECAISSEMENT,
+            montant=montant,
+            libelle=f"Reversement {r.numero} — {collecteur.nom if collecteur else ''}",
+            tiroir=compte.tiroir,
+            mode_reglement=donnees.mode_paiement,
+            beneficiaire=collecteur.nom if collecteur else None,
+            created_by_id=utilisateur.id,
+        )
+        db.add(mvt)
+        compte.solde_actuel = compte.solde_actuel - montant
+        compte.solde_theorique = compte.solde_theorique - montant
+
     db.commit()
     db.refresh(r)
     return r

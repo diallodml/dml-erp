@@ -72,6 +72,12 @@
           <input id="l_montant" type="number" min="0" step="1000" oninput="majApercu()">
         </div>
         <div>
+          <label for="l_encaissement">Encaissement
+            <span class="aide">laisser vide si le client paie plus tard</span>
+          </label>
+          <select id="l_encaissement"></select>
+        </div>
+        <div>
           <label for="l_frais">Frais à déduire
             <span class="aide">transport, manutention</span>
           </label>
@@ -116,6 +122,14 @@ document.querySelectorAll('[role="tab"]').forEach(b => {
 async function charger() {
   document.getElementById("l_date").value = new Date().toISOString().slice(0, 16);
   try {
+    try {
+      const comptes = await DML.api("/api/v1/tresorerie/comptes");
+      window.COMPTES = comptes;
+      const options = '<option value="">— pas encore encaissé —</option>' +
+        comptes.map(c => `<option value="${c.id}">${c.libelle} (${DML.fcfa(c.solde)})</option>`).join("");
+      document.getElementById("l_encaissement").innerHTML = options;
+    } catch (e) { /* pas d'acces tresorerie */ }
+
     CLIENTS = await DML.api("/api/v1/referentiel/clients");
     document.getElementById("l_client").innerHTML = CLIENTS.length
       ? CLIENTS.map(c => `<option value="${c.id}">${c.raison_sociale}</option>`).join("")
@@ -208,6 +222,7 @@ async function livrer() {
         immatriculation: document.getElementById("l_immat").value.trim() || null,
         telephone_chauffeur: document.getElementById("l_tel_chauffeur").value.trim() || null,
         frais_deduits: Number(document.getElementById("l_frais").value) || 0,
+        compte_encaissement_id: document.getElementById("l_encaissement").value || null,
       }),
     });
     afficherResultat(r);
@@ -293,6 +308,8 @@ async function payer(id, nom, solde) {
         montant_paye: Number(saisi),
         date_paiement: new Date().toISOString().slice(0, 10),
         mode_paiement: "MOBILE_MONEY",
+        compte_tresorerie_id: (window.COMPTES && window.COMPTES.length)
+          ? window.COMPTES[0].id : null,
       }),
     });
     DML.message("msg", `${r.numero} — ${DML.fcfa(r.montant_paye)} versés. Solde : ${DML.fcfa(r.solde)}.`, "ok");

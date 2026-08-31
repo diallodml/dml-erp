@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Bon de livraison {{ bl.numero }}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm; }
+  *{box-sizing:border-box}
+  body{font-family:"Inter",sans-serif;color:#14261F;margin:0;padding:24px;background:#E6E8E1}
+  .feuille{max-width:190mm;margin:0 auto;background:#fff;padding:24px 28px;border:1px solid #C3C8BC}
+  .entete{display:flex;gap:16px;align-items:flex-start;border-bottom:2px solid #14261F;padding-bottom:12px}
+  .entete img{width:66px;height:66px;object-fit:contain}
+  .entete .raison{font-size:19px;line-height:1.15;font-weight:700;color:#2F6B4F}
+  .entete .activite{font-size:12px;color:#5A6B60;margin-top:2px}
+  .entete .legal{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:#5A6B60;line-height:1.6;margin-top:5px}
+  .bandeau{display:flex;justify-content:space-between;align-items:flex-start;margin:18px 0 16px;gap:20px}
+  .titre{font-size:21px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .piece{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:#5A6B60;margin-top:3px;line-height:1.7}
+  .destinataire{border:1px solid #C3C8BC;padding:11px 14px;min-width:50%;font-size:13px}
+  .destinataire b{display:block;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#5A6B60;margin-bottom:5px}
+  .destinataire .nom{font-weight:600;font-size:14.5px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px}
+  th{text-align:left;padding:8px 10px;background:#F2F3EE;font-weight:600;border:1px solid #C3C8BC}
+  td{padding:8px 10px;border:1px solid #C3C8BC}
+  td.num{font-family:"IBM Plex Mono",monospace;text-align:right}
+  .infos th{width:26%}
+  .charge{background:#14261F;color:#fff;display:flex;margin:16px 0}
+  .charge div{flex:1;padding:13px 15px;border-right:1px solid #3A5145}
+  .charge div:last-child{border-right:none}
+  .charge span{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9DB0BB;margin-bottom:4px}
+  .charge b{font-family:"IBM Plex Mono",monospace;font-size:20px}
+  .reserve{border:1px dashed #C3C8BC;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#5A6B60}
+  .reserve b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#14261F;margin-bottom:24px}
+  .signatures{display:flex;gap:24px;margin-top:24px}
+  .sign{flex:1}
+  .sign b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:46px}
+  .sign .trait{border-top:1px solid #14261F;padding-top:4px;font-size:10.5px;color:#5A6B60}
+  .pied{margin-top:22px;padding-top:9px;border-top:1px solid #C3C8BC;font-family:"IBM Plex Mono",monospace;font-size:9px;color:#5A6B60;text-align:center;line-height:1.7}
+  .imprimer{max-width:190mm;margin:0 auto 14px;text-align:right}
+  .imprimer button{background:#E8A317;border:none;padding:9px 20px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  @media print{ body{background:#fff;padding:0} .feuille{border:none;padding:0} .imprimer{display:none} }
+</style>
+</head>
+<body>
+<div class="imprimer"><button onclick="window.print()">Imprimer</button></div>
+
+<div class="feuille">
+  <div class="entete">
+    <img src="{{ logo }}" alt="">
+    <div>
+      <div class="raison">{{ e.denomination }}</div>
+      <div class="activite">{{ e.activite }}</div>
+      <div class="legal">
+        {{ e.adresse }}<br>
+        Tel. {{ e.telephone }} &nbsp;·&nbsp; {{ e.telephone_2 }}<br>
+        NIU {{ e.niu }} &nbsp;·&nbsp; RCCM {{ e.rccm }}
+      </div>
+    </div>
+  </div>
+
+  <div class="bandeau">
+    <div>
+      <div class="titre">Bon de livraison</div>
+      <div class="piece">
+        N° {{ bl.numero }}<br>
+        Date : {{ bl.date_livraison.strftime("%d/%m/%Y") }}<br>
+        {% if bc and bc.reference_client %}<strong>Votre commande : {{ bc.reference_client }}</strong>{% endif %}
+      </div>
+    </div>
+    <div class="destinataire">
+      <b>Livré à</b>
+      <div class="nom">{{ client.raison_sociale }}</div>
+      {{ bl.lieu_livraison or client.adresse_livraison or client.ville or "" }}
+      {% if client.telephone %}<br>Tél. {{ client.telephone }}{% endif %}
+    </div>
+  </div>
+
+  <table class="infos">
+    <tr><th>Départ</th><td>{{ magasin.nom if magasin else "—" }}</td>
+        <th>Transporteur</th><td>{{ bl.transporteur_externe or "—" }}</td></tr>
+    <tr><th>Immatriculation</th><td>{{ bl.immatriculation_declaree or "—" }}</td>
+        <th>Ticket de pesée</th><td>{{ bl.numero_ticket_pesee or "—" }}</td></tr>
+  </table>
+
+  <table>
+    <thead><tr><th>Désignation</th><th>Lot</th><th style="text-align:right">Quantité (kg)</th></tr></thead>
+    <tbody>
+      {% for l in lignes %}
+      <tr>
+        <td>{{ l.designation }}</td>
+        <td>{{ l.lot }}</td>
+        <td class="num">{{ fmt(l.quantite) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="charge">
+    <div><span>Sacs livrés</span><b>{{ bl.nombre_sacs or "—" }}</b></div>
+    {% if bl.poids_livre %}
+    <div><span>Poids constaté</span><b>{{ fmt(bl.poids_livre) }} kg</b></div>
+    <div><span>Soit</span><b>{{ fmt(bl.poids_livre / 1000, 3) }} t</b></div>
+    {% endif %}
+  </div>
+
+  {% if not bl.poids_livre %}
+  <div class="reserve">
+    <b>Pesée à l'arrivée</b>
+    Poids constaté : ................................ kg &nbsp;&nbsp;
+    Ticket n° ................................<br><br>
+    Réserves : ....................................................................................................................
+  </div>
+  {% endif %}
+
+  <div class="signatures">
+    <div class="sign">
+      <b>Pour {{ e.sigle }}</b>
+      <div class="trait">Nom, signature et cachet</div>
+    </div>
+    <div class="sign">
+      <b>Le transporteur</b>
+      <div class="trait">{{ bl.transporteur_externe or "Nom et signature" }}</div>
+    </div>
+    <div class="sign">
+      <b>Le destinataire</b>
+      <div class="trait">{{ bl.signataire_client or "Nom, signature et cachet" }} — reçu le ......../......../............</div>
+    </div>
+  </div>
+
+  <div class="pied">
+    {{ e.produits }}<br>
+    {{ e.denomination }} — NIU {{ e.niu }} — RCCM {{ e.rccm }} — {{ e.centre_impots }}
+  </div>
+</div>
+</body>
+</html>

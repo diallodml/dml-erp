@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Proforma {{ pf.numero }}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm; }
+  *{box-sizing:border-box}
+  body{font-family:"Inter",sans-serif;color:#14261F;margin:0;padding:24px;background:#E6E8E1}
+  .feuille{max-width:190mm;margin:0 auto;background:#fff;padding:24px 28px;border:1px solid #C3C8BC}
+  .entete{display:flex;gap:16px;align-items:flex-start;border-bottom:2px solid #14261F;padding-bottom:12px}
+  .entete img{width:66px;height:66px;object-fit:contain}
+  .entete .raison{font-size:19px;line-height:1.15;font-weight:700;color:#2F6B4F}
+  .entete .activite{font-size:12px;color:#5A6B60;margin-top:2px}
+  .entete .legal{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:#5A6B60;line-height:1.6;margin-top:5px}
+  .bandeau{display:flex;justify-content:space-between;align-items:flex-start;margin:18px 0 16px;gap:20px}
+  .titre{font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .sous-titre{font-size:12.5px;color:#5A6B60;margin-top:2px}
+  .piece{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:#5A6B60;margin-top:6px;line-height:1.7}
+  .destinataire{border:1px solid #C3C8BC;padding:11px 14px;min-width:50%;font-size:13px}
+  .destinataire b{display:block;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#5A6B60;margin-bottom:5px}
+  .destinataire .nom{font-weight:600;font-size:14.5px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px}
+  th{text-align:left;padding:8px 10px;background:#14261F;color:#fff;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  td{padding:9px 10px;border-bottom:1px solid #DCE0D6}
+  td.num{font-family:"IBM Plex Mono",monospace;text-align:right}
+  .totaux{margin-left:auto;width:56%;border:1px solid #C3C8BC}
+  .totaux div{display:flex;justify-content:space-between;padding:8px 13px;font-size:13px;border-bottom:1px solid #DCE0D6}
+  .totaux div:last-child{border-bottom:none}
+  .totaux div b{font-family:"IBM Plex Mono",monospace}
+  .totaux .final{background:#14261F;color:#fff;font-size:15px;font-weight:600}
+  .totaux .final b{font-size:18px}
+  .validite{margin:18px 0;padding:11px 14px;border-left:3px solid #E8A317;background:#FDF8EC;font-size:12.5px}
+  .conditions{font-size:12px;color:#5A6B60;margin-bottom:22px;line-height:1.7}
+  .conditions b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#14261F;margin-bottom:3px}
+  .signature{margin-top:26px;text-align:right}
+  .signature b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:46px}
+  .signature .trait{display:inline-block;border-top:1px solid #14261F;padding-top:4px;font-size:10.5px;color:#5A6B60;min-width:210px}
+  .pied{margin-top:22px;padding-top:9px;border-top:1px solid #C3C8BC;font-family:"IBM Plex Mono",monospace;font-size:9px;color:#5A6B60;text-align:center;line-height:1.7}
+  .imprimer{max-width:190mm;margin:0 auto 14px;text-align:right}
+  .imprimer button{background:#E8A317;border:none;padding:9px 20px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  @media print{ body{background:#fff;padding:0} .feuille{border:none;padding:0} .imprimer{display:none} }
+</style>
+</head>
+<body>
+<div class="imprimer"><button onclick="window.print()">Imprimer</button></div>
+
+<div class="feuille">
+  <div class="entete">
+    <img src="{{ logo }}" alt="">
+    <div>
+      <div class="raison">{{ e.denomination }}</div>
+      <div class="activite">{{ e.activite }}</div>
+      <div class="legal">
+        {{ e.adresse }}<br>
+        Tel. {{ e.telephone }} &nbsp;·&nbsp; {{ e.telephone_2 }} &nbsp;·&nbsp; {{ e.email }}<br>
+        NIU {{ e.niu }} &nbsp;·&nbsp; RCCM {{ e.rccm }}
+      </div>
+    </div>
+  </div>
+
+  <div class="bandeau">
+    <div>
+      <div class="titre">Facture proforma</div>
+      <div class="sous-titre">Offre de prix — ne vaut pas facture</div>
+      <div class="piece">
+        N° {{ pf.numero }}{% if pf.version and pf.version > 1 %} — version {{ pf.version }}{% endif %}<br>
+        Date : {{ pf.date_emission.strftime("%d/%m/%Y") }}<br>
+        {% if pf.date_expiration %}Valable jusqu'au : {{ pf.date_expiration.strftime("%d/%m/%Y") }}{% endif %}
+      </div>
+    </div>
+    <div class="destinataire">
+      <b>À l'attention de</b>
+      <div class="nom">{{ client.raison_sociale }}</div>
+      {% if client.adresse_livraison %}{{ client.adresse_livraison }}<br>{% endif %}
+      {{ client.ville or "" }}
+      {% if client.contact_principal %}<br>{{ client.contact_principal }}{% endif %}
+      {% if client.telephone %}<br>Tél. {{ client.telephone }}{% endif %}
+    </div>
+  </div>
+
+  {% if pf.objet %}
+  <p style="font-size:13px;margin-bottom:14px"><strong>Objet :</strong> {{ pf.objet }}</p>
+  {% endif %}
+
+  <table>
+    <thead><tr>
+      <th>Désignation</th>
+      <th style="text-align:right">Quantité (kg)</th>
+      <th style="text-align:right">P.U. (F/kg)</th>
+      <th style="text-align:right">Montant</th>
+    </tr></thead>
+    <tbody>
+      {% for l in lignes %}
+      <tr>
+        <td>{{ l.designation or "Produits agricoles" }}</td>
+        <td class="num">{{ fmt(l.quantite) }}</td>
+        <td class="num">{{ fmt(l.prix_unitaire) }}</td>
+        <td class="num">{{ fmt(l.montant_ht) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="totaux">
+    <div><span>Total marchandise</span><b>{{ fmt(pf.montant_ht) }} F</b></div>
+    {% if pf.frais_transport and pf.frais_transport > 0 %}
+    <div><span>Transport</span><b>{{ fmt(pf.frais_transport) }} F</b></div>
+    {% endif %}
+    <div class="final"><span>Total</span><b>{{ fmt(pf.montant_ttc) }} F</b></div>
+  </div>
+
+  <div class="validite">
+    Cette offre est valable {{ pf.duree_validite_jours }} jours à compter de sa date d'émission.
+    Au-delà, les prix sont susceptibles de révision.
+  </div>
+
+  <div class="conditions">
+    {% if pf.conditions_paiement %}
+    <b>Conditions de paiement</b>{{ pf.conditions_paiement }}<br><br>
+    {% endif %}
+    {% if pf.conditions_livraison %}
+    <b>Conditions de livraison</b>{{ pf.conditions_livraison }}<br><br>
+    {% endif %}
+  </div>
+
+  <div class="signature">
+    <b>Pour {{ e.sigle }}</b>
+    <div class="trait">Nom, signature et cachet</div>
+  </div>
+
+  <div class="pied">
+    {{ e.produits }}<br>
+    {{ e.denomination }} — NIU {{ e.niu }} — RCCM {{ e.rccm }} — {{ e.centre_impots }}<br>
+    « {{ e.devise_slogan }} »
+  </div>
+</div>
+</body>
+</html>

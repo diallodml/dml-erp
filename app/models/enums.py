@@ -872,3 +872,63 @@ class BaseFacturationTraitement(str, Enum):
     TONNE_ENTREE = "TONNE_ENTREE"
     TONNE_SORTIE = "TONNE_SORTIE"
     FORFAIT_LOT = "FORFAIT_LOT"
+
+
+# ===========================================================================
+# BON DE COMMANDE CLIENT ET FACTURE
+# ===========================================================================
+class StatutBonCommande(str, Enum):
+    OUVERT = "OUVERT"
+    PARTIELLEMENT_LIVRE = "PARTIELLEMENT_LIVRE"
+    LIVRE = "LIVRE"
+    CLOTURE = "CLOTURE"
+    ANNULE = "ANNULE"
+
+
+class StatutFactureClient(str, Enum):
+    EMISE = "EMISE"
+    ENVOYEE = "ENVOYEE"
+    PARTIELLEMENT_PAYEE = "PARTIELLEMENT_PAYEE"
+    PAYEE = "PAYEE"
+    ANNULEE = "ANNULEE"
+    LITIGE = "LITIGE"
+
+
+# ===========================================================================
+# BON DE COMMANDE CLIENT ET FACTURE
+# ===========================================================================
+class StatutBonCommande(str, Enum):
+    OUVERT = "OUVERT"
+    PARTIELLEMENT_LIVRE = "PARTIELLEMENT_LIVRE"
+    LIVRE = "LIVRE"
+    CLOTURE = "CLOTURE"
+    ANNULE = "ANNULE"
+
+
+class StatutFactureClient(str, Enum):
+    EMISE = "EMISE"
+    ENVOYEE = "ENVOYEE"
+    PARTIELLEMENT_PAYEE = "PARTIELLEMENT_PAYEE"
+    PAYEE = "PAYEE"
+    ANNULEE = "ANNULEE"
+    LITIGE = "LITIGE"
+
+
+# ===========================================================================
+# BON DE COMMANDE CLIENT ET FACTURE
+# ===========================================================================
+class StatutBonCommande(str, Enum):
+    OUVERT = "OUVERT"
+    PARTIELLEMENT_LIVRE = "PARTIELLEMENT_LIVRE"
+    LIVRE = "LIVRE"
+    CLOTURE = "CLOTURE"
+    ANNULE = "ANNULE"
+
+
+class StatutFactureClient(str, Enum):
+    EMISE = "EMISE"
+    ENVOYEE = "ENVOYEE"
+    PARTIELLEMENT_PAYEE = "PARTIELLEMENT_PAYEE"
+    PAYEE = "PAYEE"
+    ANNULEE = "ANNULEE"
+    LITIGE = "LITIGE"

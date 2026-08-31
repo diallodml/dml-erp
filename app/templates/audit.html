@@ -7,7 +7,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/dml.css?v=4">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DML">
+<meta name="theme-color" content="#14261F">
+<link rel="stylesheet" href="/static/dml.css?v=6">
 <style>
   .puce{
     display:inline-block;padding:2px 9px;font-family:var(--data);
@@ -46,7 +51,7 @@
   <div id="table-journal"></div>
 </main>
 
-<script src="/static/dml.js?v=4"></script>
+<script src="/static/dml.js?v=6"></script>
 <script>
 if (DML.exigerSession()) DML.barre("/audit");
 

@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.api.v1 import export, audit, rentabilite, annulation, auth, collecte, referentiel, traitement, tresorerie, utilisateur, vente
+from app.api.v1 import facturation, export, audit, rentabilite, annulation, auth, collecte, referentiel, traitement, tresorerie, utilisateur, vente
 
 app = FastAPI(
     title="ERP DML SARL",
@@ -21,6 +21,7 @@ app.include_router(export.router)
 app.include_router(collecte.router)
 app.include_router(referentiel.router)
 app.include_router(vente.router)
+app.include_router(facturation.router)
 app.include_router(traitement.router)
 app.include_router(utilisateur.router)
 app.include_router(tresorerie.router)
@@ -105,3 +106,8 @@ def page_audit(request: Request):
 @app.get("/mot-de-passe", response_class=HTMLResponse, include_in_schema=False)
 def page_mot_de_passe(request: Request):
     return templates.TemplateResponse(request, "mot_de_passe.html")
+
+
+@app.get("/facturation", response_class=HTMLResponse, include_in_schema=False)
+def page_facturation(request: Request):
+    return templates.TemplateResponse(request, "facturation.html")

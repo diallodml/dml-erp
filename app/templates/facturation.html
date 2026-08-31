@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commandes et factures — ERP DML SARL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="stylesheet" href="/static/dml.css?v=6">
+<style>
+  .puce{display:inline-block;padding:2px 9px;font-family:var(--data);
+    font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;border:1px solid}
+  .puce.ouvert{background:rgba(232,163,23,.20);border-color:#B07B0C;color:#7A5507}
+  .puce.livre {background:rgba(47,107,79,.14);border-color:var(--gain);color:var(--gain)}
+  .puce.impaye{background:var(--perte);border-color:var(--perte);color:#fff}
+  .puce.paye  {background:rgba(47,107,79,.14);border-color:var(--gain);color:var(--gain)}
+  .actions-ligne{display:flex;gap:4px;flex-wrap:wrap}
+  .actions-ligne button{padding:4px 9px;font-size:12px;white-space:nowrap}
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <h1>Commandes et factures</h1>
+    <p>Le client commande, vous chargez, il pèse, vous facturez sur son tonnage.</p>
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" data-vue="proforma" aria-selected="true">Proforma</button>
+    <button role="tab" data-vue="commande" aria-selected="false">Commande reçue</button>
+    <button role="tab" data-vue="charger" aria-selected="false">Charger</button>
+    <button role="tab" data-vue="peser" aria-selected="false">Pesée client</button>
+    <button role="tab" data-vue="facturer" aria-selected="false">Facturer</button>
+    <button role="tab" data-vue="factures" aria-selected="false">Factures</button>
+  </div>
+
+  <div id="msg" class="message" hidden></div>
+
+  <!-- COMMANDE -->
+  <section id="vue-proforma">
+    <fieldset>
+      <legend>Proposer un prix</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="pf_client">Client</label>
+          <select id="pf_client"></select>
+        </div>
+        <div>
+          <label for="pf_produit">Produit</label>
+          <select id="pf_produit"></select>
+        </div>
+        <div>
+          <label for="pf_date">Date</label>
+          <input id="pf_date" type="date">
+        </div>
+        <div>
+          <label for="pf_quantite">Tonnage proposé
+            <span class="aide">en kg</span>
+          </label>
+          <input id="pf_quantite" type="number" min="1" step="100" oninput="majPf()">
+        </div>
+        <div>
+          <label for="pf_prix">Prix au kilo
+            <span class="aide">en FCFA</span>
+          </label>
+          <input id="pf_prix" type="number" min="1" step="5" oninput="majPf()">
+        </div>
+        <div>
+          <label for="pf_validite">Validité
+            <span class="aide">en jours</span>
+          </label>
+          <input id="pf_validite" type="number" min="1" step="1" value="15">
+        </div>
+        <div>
+          <label for="pf_transport">Frais de transport</label>
+          <input id="pf_transport" type="number" min="0" step="1000" value="0">
+        </div>
+        <div>
+          <label for="pf_revise">Révision de
+            <span class="aide">si le client a contre-proposé</span>
+          </label>
+          <select id="pf_revise"></select>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="pf_objet">Objet</label>
+        <input id="pf_objet" type="text" maxlength="255" placeholder="Fourniture de maïs grain">
+      </div>
+      <div style="margin-top:14px">
+        <label for="pf_paiement">Conditions de paiement</label>
+        <input id="pf_paiement" type="text" placeholder="Paiement à 30 jours">
+      </div>
+      <div id="apercu-pf" class="message ok" hidden></div>
+      <div class="actions">
+        <button class="bouton" onclick="creerProforma()">Émettre la proforma</button>
+      </div>
+    </fieldset>
+
+    <h2>Offres envoyées</h2>
+    <div id="table-proformas"></div>
+  </section>
+
+  <section id="vue-commande" hidden>
+    <fieldset>
+      <legend>Enregistrer un bon de commande</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="c_client">Client</label>
+          <select id="c_client"></select>
+        </div>
+        <div>
+          <label for="c_ref">Référence du client
+            <span class="aide">le numéro qu'il vous donne</span>
+          </label>
+          <input id="c_ref" type="text" maxlength="80">
+        </div>
+        <div>
+          <label for="c_produit">Produit</label>
+          <select id="c_produit"></select>
+        </div>
+        <div>
+          <label for="c_date">Date de commande</label>
+          <input id="c_date" type="date">
+        </div>
+        <div>
+          <label for="c_tonnage">Tonnage demandé
+            <span class="aide">en kg</span>
+          </label>
+          <input id="c_tonnage" type="number" min="1" step="100" oninput="majMontant()">
+        </div>
+        <div>
+          <label for="c_prix">Prix au kilo
+            <span class="aide">en FCFA, convenu avec le client</span>
+          </label>
+          <input id="c_prix" type="number" min="1" step="5" oninput="majMontant()">
+        </div>
+        <div>
+          <label for="c_souhaitee">Livraison souhaitée</label>
+          <input id="c_souhaitee" type="date">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="c_lieu">Lieu de livraison</label>
+        <input id="c_lieu" type="text" maxlength="255">
+      </div>
+      <div id="apercu" class="message ok" hidden></div>
+      <div class="actions">
+        <button class="bouton" onclick="creerCommande()">Enregistrer la commande</button>
+      </div>
+    </fieldset>
+
+    <h2>Commandes en cours</h2>
+    <div id="resume-commandes"></div>
+    <div id="table-commandes"></div>
+  </section>
+
+  <!-- CHARGER -->
+  <section id="vue-charger" hidden>
+    <fieldset>
+      <legend>Charger le camion</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="l_commande">Commande</label>
+          <select id="l_commande"></select>
+        </div>
+        <div>
+          <label for="l_lot">Lot</label>
+          <select id="l_lot"></select>
+        </div>
+        <div>
+          <label for="l_date">Date de départ</label>
+          <input id="l_date" type="date">
+        </div>
+        <div>
+          <label for="l_sacs">Nombre de sacs chargés
+            <span class="aide">votre seul contrôle avant la pesée</span>
+          </label>
+          <input id="l_sacs" type="number" min="1" step="1" oninput="majEstimation()">
+        </div>
+        <div>
+          <label for="l_poidssac">Poids d'un sac
+            <span class="aide">en kg</span>
+          </label>
+          <input id="l_poidssac" type="number" min="1" step="1" value="100" oninput="majEstimation()">
+        </div>
+        <div>
+          <label for="l_transporteur">Transporteur</label>
+          <input id="l_transporteur" type="text" maxlength="180">
+        </div>
+        <div>
+          <label for="l_immat">Immatriculation</label>
+          <input id="l_immat" type="text" maxlength="30">
+        </div>
+      </div>
+      <div id="estimation" class="message ok" hidden></div>
+      <div class="actions">
+        <button class="bouton" onclick="creerLivraison()">Enregistrer le chargement</button>
+      </div>
+    </fieldset>
+    <div id="resultat-charge"></div>
+  </section>
+
+  <!-- PESEE -->
+  <section id="vue-peser" hidden>
+    <fieldset>
+      <legend>Tonnage communiqué par le client</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="p_livraison">Livraison</label>
+          <select id="p_livraison" onchange="majCharge()"></select>
+        </div>
+        <div>
+          <label for="p_date">Date de pesée</label>
+          <input id="p_date" type="datetime-local">
+        </div>
+        <div>
+          <label for="p_poids">Poids pesé chez le client
+            <span class="aide" id="charge-info">en kg</span>
+          </label>
+          <input id="p_poids" type="number" min="1" step="1">
+        </div>
+        <div>
+          <label for="p_ticket">Numéro du ticket de pesée</label>
+          <input id="p_ticket" type="text" maxlength="60">
+        </div>
+        <div>
+          <label for="p_signataire">Réceptionné par</label>
+          <input id="p_signataire" type="text" maxlength="150">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="p_reserves">Réserves du client</label>
+        <input id="p_reserves" type="text">
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="enregistrerPesee()">Enregistrer la pesée</button>
+      </div>
+    </fieldset>
+    <div id="resultat-pesee"></div>
+  </section>
+
+  <!-- FACTURER -->
+  <section id="vue-facturer" hidden>
+    <fieldset>
+      <legend>Émettre la facture</legend>
+      <div class="grille-champs">
+        <div>
+          <label for="f_livraison">Livraison pesée</label>
+          <select id="f_livraison"></select>
+        </div>
+        <div>
+          <label for="f_date">Date de facture</label>
+          <input id="f_date" type="date">
+        </div>
+        <div>
+          <label for="f_echeance">Échéance de paiement</label>
+          <input id="f_echeance" type="date">
+        </div>
+        <div>
+          <label for="f_prix">Prix au kilo
+            <span class="aide">vide = celui du bon de commande</span>
+          </label>
+          <input id="f_prix" type="number" min="0" step="5">
+        </div>
+        <div>
+          <label for="f_transport">Frais de transport
+            <span class="aide">si refacturés</span>
+          </label>
+          <input id="f_transport" type="number" min="0" step="1000" value="0">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="bouton" onclick="creerFacture()">Émettre la facture</button>
+      </div>
+    </fieldset>
+    <div id="resultat-facture"></div>
+  </section>
+
+  <!-- FACTURES -->
+  <section id="vue-factures" hidden>
+    <h2>Factures émises</h2>
+    <div id="table-factures"></div>
+  </section>
+</main>
+
+<script src="/static/dml.js?v=6"></script>
+<script>
+if (DML.exigerSession()) DML.barre("/facturation");
+
+let CLIENTS = [], PRODUITS = [], LOTS = [], COMMANDES = [], A_PESER = [], COMPTES = [];
+
+document.querySelectorAll('[role="tab"]').forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute("aria-selected", "false"));
+    b.setAttribute("aria-selected", "true");
+    ["proforma", "commande", "charger", "peser", "facturer", "factures"].forEach(v =>
+      document.getElementById("vue-" + v).hidden = (v !== b.dataset.vue));
+    DML.cacherMessage("msg");
+    if (b.dataset.vue === "proforma") listerProformas();
+    if (b.dataset.vue === "charger") chargerListes();
+    if (b.dataset.vue === "peser") chargerAPeser();
+    if (b.dataset.vue === "facturer") chargerAFacturer();
+    if (b.dataset.vue === "factures") listerFactures();
+  });
+});
+
+async function init() {
+  const auj = new Date().toISOString().slice(0, 10);
+  ["c_date", "l_date", "f_date"].forEach(i => document.getElementById(i).value = auj);
+  document.getElementById("p_date").value = new Date().toISOString().slice(0, 16);
+
+  try {
+    CLIENTS = await DML.api("/api/v1/referentiel/clients");
+    document.getElementById("c_client").innerHTML = CLIENTS.length
+      ? CLIENTS.map(c => `<option value="${c.id}">${c.raison_sociale}</option>`).join("")
+      : '<option value="">Aucun client enregistré</option>';
+  } catch (e) { /* silencieux */ }
+
+  try {
+    const refs = await DML.api("/api/v1/collecte/referentiels");
+    PRODUITS = refs.produits || [];
+    document.getElementById("c_produit").innerHTML =
+      PRODUITS.map(p => `<option value="${p.id}">${p.nom}</option>`).join("");
+  } catch (e) { /* silencieux */ }
+
+  try { COMPTES = await DML.api("/api/v1/tresorerie/comptes"); } catch (e) {}
+
+  const selClient = document.getElementById("pf_client");
+  if (selClient) selClient.innerHTML = document.getElementById("c_client").innerHTML;
+  const selProduit = document.getElementById("pf_produit");
+  if (selProduit) selProduit.innerHTML = document.getElementById("c_produit").innerHTML;
+  document.getElementById("pf_date").value = new Date().toISOString().slice(0, 10);
+
+  listerProformas();
+  listerCommandes();
+}
+
+function majMontant() {
+  const t = Number(document.getElementById("c_tonnage").value) || 0;
+  const p = Number(document.getElementById("c_prix").value) || 0;
+  const el = document.getElementById("apercu");
+  if (!t || !p) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `Montant de la commande : <strong>${DML.fcfa(t * p)}</strong>
+    pour ${(t / 1000).toFixed(3)} tonne(s) à ${p} F/kg.`;
+}
+
+async function creerCommande() {
+  DML.cacherMessage("msg");
+  const ref = document.getElementById("c_ref").value.trim();
+  if (!ref) { DML.message("msg", "La référence du client est obligatoire.", "erreur"); return; }
+  try {
+    const r = await DML.api("/api/v1/facturation/commandes", {
+      method: "POST",
+      body: JSON.stringify({
+        client_id: document.getElementById("c_client").value,
+        reference_client: ref,
+        produit_id: document.getElementById("c_produit").value,
+        date_commande: document.getElementById("c_date").value,
+        tonnage_demande_kg: Number(document.getElementById("c_tonnage").value),
+        prix_kg: Number(document.getElementById("c_prix").value),
+        date_livraison_souhaitee: document.getElementById("c_souhaitee").value || null,
+        lieu_livraison: document.getElementById("c_lieu").value.trim() || null,
+      }),
+    });
+    DML.message("msg", `Commande ${r.numero} enregistrée — réf. ${r.reference_client}, ${DML.fcfa(r.montant)}.`, "ok");
+    ["c_ref", "c_tonnage", "c_lieu"].forEach(i => document.getElementById(i).value = "");
+    document.getElementById("apercu").hidden = true;
+    listerCommandes();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function listerCommandes() {
+  try {
+    const liste = await DML.api("/api/v1/facturation/commandes");
+    const du = liste.reduce((s, c) => s + Number(c.reste_du || 0), 0);
+    const facture = liste.reduce((s, c) => s + Number(c.montant_facture || 0), 0);
+    document.getElementById("resume-commandes").innerHTML = du > 0
+      ? `<div class="cartes" style="margin-bottom:16px">
+           <div class="carte"><span class="etiquette">Total facturé</span>
+             <div class="valeur">${DML.fcfa(facture)}</div></div>
+           <div class="carte"><span class="etiquette">Reste à encaisser</span>
+             <div class="valeur alerte">${DML.fcfa(du)}</div></div>
+         </div>` : "";
+
+    document.getElementById("table-commandes").innerHTML = liste.length ? `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>État</th><th>Pièce</th><th>Réf. client</th><th>Client</th>
+          <th>Produit</th><th>Demandé</th><th>Livré</th><th>Reste</th>
+          <th>Prix/kg</th><th>Prévu</th><th>Facturé</th><th>Encaissé</th><th>Reste dû</th></tr></thead>
+        <tbody>${liste.map(c => `<tr>
+          <td><span class="puce ${c.statut === "LIVREE" ? "livre" : "ouvert"}">
+            ${c.statut === "LIVREE" ? "Livrée" : "En cours"}</span></td>
+          <td>${c.numero}</td><td>${c.reference_client}</td><td>${c.client}</td>
+          <td>${c.produit}</td>
+          <td class="num">${DML.kg(c.tonnage_demande_kg)}</td>
+          <td class="num">${DML.kg(c.tonnage_livre_kg)}</td>
+          <td class="num">${DML.kg(c.reste_kg)}</td>
+          <td class="num">${c.prix_kg} F</td>
+          <td class="num">${DML.fcfa(c.montant_prevu)}</td>
+          <td class="num">${DML.fcfa(c.montant_facture)}</td>
+          <td class="num">${DML.fcfa(c.montant_encaisse)}</td>
+          <td class="num ${Number(c.reste_du) > 0 ? "negatif" : ""}">${DML.fcfa(c.reste_du)}</td>
+        </tr>`).join("")}</tbody></table></div>`
+      : '<div class="vide">Aucune commande enregistrée.</div>';
+  } catch (e) {
+    document.getElementById("table-commandes").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function chargerListes() {
+  try {
+    COMMANDES = await DML.api("/api/v1/facturation/commandes?ouvertes=true");
+    document.getElementById("l_commande").innerHTML = COMMANDES.length
+      ? COMMANDES.map(c => `<option value="${c.id}">${c.numero} — ${c.client} — reste ${DML.kg(c.reste_kg)}</option>`).join("")
+      : '<option value="">Aucune commande en cours</option>';
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+  try {
+    LOTS = await DML.api("/api/v1/vente/lots");
+    document.getElementById("l_lot").innerHTML = LOTS.length
+      ? LOTS.map(l => `<option value="${l.id}">${l.nom}</option>`).join("")
+      : '<option value="">Aucun lot en stock</option>';
+  } catch (e) { /* silencieux */ }
+}
+
+function majEstimation() {
+  const s = Number(document.getElementById("l_sacs").value) || 0;
+  const p = Number(document.getElementById("l_poidssac").value) || 0;
+  const el = document.getElementById("estimation");
+  if (!s || !p) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `Poids estimé au départ : <strong>${DML.kg(s * p)}</strong>
+    — le client pèsera à l'arrivée.`;
+}
+
+async function creerLivraison() {
+  DML.cacherMessage("msg");
+  try {
+    const r = await DML.api("/api/v1/facturation/livraisons", {
+      method: "POST",
+      body: JSON.stringify({
+        commande_id: document.getElementById("l_commande").value,
+        lot_id: document.getElementById("l_lot").value,
+        date_livraison: document.getElementById("l_date").value,
+        nombre_sacs: Number(document.getElementById("l_sacs").value),
+        poids_sac_kg: Number(document.getElementById("l_poidssac").value),
+        transporteur: document.getElementById("l_transporteur").value.trim() || null,
+        immatriculation: document.getElementById("l_immat").value.trim() || null,
+      }),
+    });
+    document.getElementById("resultat-charge").innerHTML = `
+      <div class="balance">
+        <div class="titre">Chargement enregistré</div>
+        <div class="chiffre">${r.nombre_sacs} sacs</div>
+        <div class="sous">Bon de livraison <strong>${r.numero}</strong> —
+          ${DML.kg(r.poids_charge_kg)} estimés. En attente de la pesée du client.</div>
+      </div>`;
+    document.getElementById("resultat-charge").innerHTML +=
+      `<div class="actions"><button class="bouton secondaire"
+         onclick="ouvrirDoc('/api/v1/facturation/livraisons/${r.id}/document')">
+         Imprimer le bon de livraison ${r.numero}</button></div>`;
+    DML.message("msg", `${r.numero} enregistré.`, "ok");
+    document.getElementById("l_sacs").value = "";
+    document.getElementById("estimation").hidden = true;
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function chargerAPeser() {
+  try {
+    A_PESER = await DML.api("/api/v1/facturation/livraisons-a-peser");
+    document.getElementById("p_livraison").innerHTML = A_PESER.length
+      ? A_PESER.map(l => `<option value="${l.id}">${l.nom}</option>`).join("")
+      : '<option value="">Aucun camion en attente de pesée</option>';
+    majCharge();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+function majCharge() {
+  const id = document.getElementById("p_livraison").value;
+  const l = A_PESER.find(x => x.id === id);
+  document.getElementById("charge-info").textContent = l
+    ? `en kg — ${l.nombre_sacs} sacs chargés, ${DML.kg(l.poids_charge_kg)} estimés`
+    : "en kg";
+}
+
+async function enregistrerPesee() {
+  DML.cacherMessage("msg");
+  const id = document.getElementById("p_livraison").value;
+  if (!id) { DML.message("msg", "Choisissez une livraison.", "erreur"); return; }
+  try {
+    const r = await DML.api(`/api/v1/facturation/livraisons/${id}/pesee`, {
+      method: "POST",
+      body: JSON.stringify({
+        date_pesee: document.getElementById("p_date").value + ":00Z",
+        poids_livre_kg: Number(document.getElementById("p_poids").value),
+        numero_ticket: document.getElementById("p_ticket").value.trim() || null,
+        signataire: document.getElementById("p_signataire").value.trim() || null,
+        reserves: document.getElementById("p_reserves").value.trim() || null,
+      }),
+    });
+    const ecart = Number(r.ecart_kg);
+    document.getElementById("resultat-pesee").innerHTML = `
+      <div class="balance">
+        <div class="titre">Écart entre les sacs chargés et la pesée du client</div>
+        <div class="chiffre ${ecart < 0 ? "negatif" : "positif"}">
+          ${ecart > 0 ? "+" : ""}${DML.kg(ecart)}</div>
+        <div class="sous">
+          ${r.nombre_sacs} sacs chargés, soit ${DML.kg(r.poids_charge_kg)} estimés.
+          Le client a pesé <strong>${DML.kg(r.poids_livre_kg)}</strong>.
+          ${ecart < 0 ? "Sa bascule annonce moins que ce que vous avez chargé."
+                      : "Sa bascule annonce plus que votre estimation."}
+        </div>
+      </div>`;
+    document.getElementById("resultat-pesee").innerHTML +=
+      `<div class="actions"><button class="bouton secondaire"
+         onclick="ouvrirDoc('/api/v1/facturation/livraisons/${id}/document')">
+         Imprimer le bon de livraison</button></div>`;
+    DML.message("msg", `${r.numero} pesé. Vous pouvez facturer.`, "ok");
+    document.getElementById("p_poids").value = "";
+    chargerAPeser();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function chargerAFacturer() {
+  try {
+    const liste = await DML.api("/api/v1/facturation/a-facturer");
+    document.getElementById("f_livraison").innerHTML = liste.length
+      ? liste.map(l => `<option value="${l.id}">${l.nom}</option>`).join("")
+      : '<option value="">Aucune livraison à facturer</option>';
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function creerFacture() {
+  DML.cacherMessage("msg");
+  const id = document.getElementById("f_livraison").value;
+  if (!id) { DML.message("msg", "Choisissez une livraison pesée.", "erreur"); return; }
+  try {
+    const r = await DML.api(`/api/v1/facturation/livraisons/${id}/facture`, {
+      method: "POST",
+      body: JSON.stringify({
+        date_facture: document.getElementById("f_date").value,
+        date_echeance: document.getElementById("f_echeance").value || null,
+        prix_kg: Number(document.getElementById("f_prix").value) || null,
+        frais_transport: Number(document.getElementById("f_transport").value) || 0,
+      }),
+    });
+    document.getElementById("resultat-facture").innerHTML = `
+      <div class="balance">
+        <div class="titre">Facture ${r.numero}${r.reference_client ? ` — réf. ${r.reference_client}` : ""}</div>
+        <div class="chiffre positif">${DML.fcfa(r.montant_ttc)}</div>
+        <div class="sous">${DML.kg(r.tonnage_kg)} à ${r.prix_kg} F/kg.
+          Marge sur cette livraison : <strong>${DML.fcfa(r.marge)}</strong>.</div>
+      </div>`;
+    document.getElementById("resultat-facture").innerHTML +=
+      `<div class="actions"><button class="bouton secondaire"
+         onclick="ouvrirDoc('/api/v1/facturation/factures/${r.id}/document')">
+         Imprimer la facture ${r.numero}</button></div>`;
+    DML.message("msg", `Facture ${r.numero} émise.`, "ok");
+    chargerAFacturer();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function listerFactures() {
+  try {
+    const liste = await DML.api("/api/v1/facturation/factures");
+    document.getElementById("table-factures").innerHTML = liste.length ? `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>État</th><th>Facture</th><th>Réf. client</th><th>Client</th>
+          <th>Date</th><th>Échéance</th><th>Montant</th><th>Réglé</th>
+          <th>Reste dû</th><th>Marge</th><th></th></tr></thead>
+        <tbody>${liste.map(f => {
+          const impaye = Number(f.reste_du) > 0;
+          return `<tr>
+            <td><span class="puce ${impaye ? "impaye" : "paye"}">
+              ${impaye ? "Impayée" : "Réglée"}</span></td>
+            <td>${f.numero}</td><td>${f.reference_client}</td><td>${f.client}</td>
+            <td>${f.date_facture}</td><td>${f.date_echeance || "—"}</td>
+            <td class="num">${DML.fcfa(f.montant_ttc)}</td>
+            <td class="num">${DML.fcfa(f.montant_regle)}</td>
+            <td class="num ${impaye ? "negatif" : ""}">${DML.fcfa(f.reste_du)}</td>
+            <td class="num">${DML.fcfa(f.marge)}</td>
+            <td><div class="actions-ligne">
+              <button class="bouton secondaire"
+                onclick="ouvrirDoc('/api/v1/facturation/factures/${f.id}/document')">Imprimer</button>
+              ${impaye ? `<button class="bouton secondaire"
+                onclick="regler('${f.id}','${f.numero}',${f.reste_du})">Encaisser</button>` : ""}
+            </div></td>
+          </tr>`;
+        }).join("")}</tbody></table></div>`
+      : '<div class="vide">Aucune facture émise.</div>';
+  } catch (e) {
+    document.getElementById("table-factures").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
+}
+
+async function ouvrirDoc(url) {
+  try {
+    const r = await fetch(url, { headers: { "Authorization": "Bearer " + DML.jeton() } });
+    if (!r.ok) throw new Error("Document indisponible");
+    const html = await r.text();
+    const blob = new Blob([html], { type: "text/html" });
+    const u = URL.createObjectURL(blob);
+    const f = window.open(u, "_blank");
+    if (!f) location.href = u;
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function regler(id, numero, solde) {
+  const montant = prompt(`Montant encaissé sur ${numero} :`, Math.floor(Number(solde)));
+  if (!montant) return;
+
+  if (!COMPTES.length) {
+    DML.message("msg", "Créez d'abord un compte dans l'écran Caisse.", "erreur");
+    return;
+  }
+
+  const liste = COMPTES.map((c, i) => `${i + 1}. ${c.libelle}`).join("\n");
+  const choix = prompt(`Sur quel compte ?\n\n${liste}\n\nNuméro :`, "1");
+  if (!choix) return;
+  const compte = COMPTES[Number(choix) - 1];
+  if (!compte) { DML.message("msg", "Compte inconnu.", "erreur"); return; }
+
+  const mode = compte.type === "BANQUE" ? "VIREMENT"
+             : compte.type === "MOBILE_MONEY" ? "MOBILE_MONEY" : "ESPECES";
+
+  try {
+    const r = await DML.api(`/api/v1/facturation/factures/${id}/reglement`, {
+      method: "POST",
+      body: JSON.stringify({
+        montant: Number(montant),
+        date_reglement: new Date().toISOString().slice(0, 10),
+        mode_reglement: mode,
+        compte_tresorerie_id: compte.id,
+      }),
+    });
+    DML.message("msg",
+      `${r.numero} — ${DML.fcfa(r.montant_regle)} encaissés sur ${compte.libelle}. ` +
+      `Reste ${DML.fcfa(r.reste_du)}.`, "ok");
+    listerFactures();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+
+function majPf() {
+  const q = Number(document.getElementById("pf_quantite").value) || 0;
+  const p = Number(document.getElementById("pf_prix").value) || 0;
+  const el = document.getElementById("apercu-pf");
+  if (!q || !p) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `Offre : <strong>${DML.fcfa(q * p)}</strong>
+    pour ${(q / 1000).toFixed(3)} tonne(s) à ${p} F/kg.`;
+}
+
+async function creerProforma() {
+  DML.cacherMessage("msg");
+  try {
+    const r = await DML.api("/api/v1/facturation/proformas", {
+      method: "POST",
+      body: JSON.stringify({
+        client_id: document.getElementById("pf_client").value,
+        produit_id: document.getElementById("pf_produit").value,
+        date_emission: document.getElementById("pf_date").value,
+        quantite_kg: Number(document.getElementById("pf_quantite").value),
+        prix_kg: Number(document.getElementById("pf_prix").value),
+        validite_jours: Number(document.getElementById("pf_validite").value) || 15,
+        frais_transport: Number(document.getElementById("pf_transport").value) || 0,
+        objet: document.getElementById("pf_objet").value.trim() || null,
+        conditions_paiement: document.getElementById("pf_paiement").value.trim() || null,
+        proforma_origine_id: document.getElementById("pf_revise").value || null,
+      }),
+    });
+    DML.message("msg",
+      `Proforma ${r.numero}${r.version > 1 ? ` (version ${r.version})` : ""} émise — ${DML.fcfa(r.montant)}.`, "ok");
+    document.getElementById("apercu-pf").hidden = true;
+    listerProformas();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+async function listerProformas() {
+  try {
+    const liste = await DML.api("/api/v1/facturation/proformas");
+
+    const revisables = liste.filter(p => p.statut === "ENVOYEE");
+    document.getElementById("pf_revise").innerHTML =
+      '<option value="">— nouvelle offre —</option>' +
+      revisables.map(p => `<option value="${p.id}">${p.numero} — ${p.client} — ${p.prix_kg} F/kg</option>`).join("");
+
+    if (!liste.length) {
+      document.getElementById("table-proformas").innerHTML =
+        '<div class="vide">Aucune offre envoyée. Proposez un prix ci-dessus.</div>';
+      return;
+    }
+
+    document.getElementById("table-proformas").innerHTML = `
+      <div class="enveloppe-table"><table>
+        <thead><tr><th>Offre</th><th>Client</th><th>Produit</th><th>Tonnage</th>
+          <th>Prix/kg</th><th>Total</th><th>Expire le</th><th>Statut</th><th></th></tr></thead>
+        <tbody>${liste.map(p => `<tr>
+          <td>${p.numero}${p.version > 1 ? ` <span class="qui">v${p.version}</span>` : ""}
+            ${p.revise_de ? `<br><span class="qui" style="font-size:11px">révise ${p.revise_de}</span>` : ""}</td>
+          <td>${p.client}</td>
+          <td>${p.produit}</td>
+          <td class="num">${DML.kg(p.quantite_kg)}</td>
+          <td class="num">${p.prix_kg} F</td>
+          <td class="num">${DML.fcfa(p.montant_ttc)}</td>
+          <td>${p.date_expiration || "—"}</td>
+          <td>${libelleStatut(p.statut)}</td>
+          <td><div class="actions-ligne">
+            <button class="bouton secondaire"
+              onclick="ouvrirDoc('/api/v1/facturation/proformas/${p.id}/document')">Imprimer</button>
+            ${p.statut === "ENVOYEE" ? `<button class="bouton secondaire"
+              onclick="accepter('${p.id}','${p.numero}')">Acceptée</button>` : ""}
+          </div></td>
+        </tr>`).join("")}</tbody></table></div>`;
+  } catch (e) {
+    document.getElementById("table-proformas").innerHTML = `<div class="vide">${e.message}</div>`;
+  }
+}
+
+function libelleStatut(s) {
+  const m = { ENVOYEE: "En attente", ACCEPTEE: "Acceptée", REFUSEE: "Révisée",
+              TRANSFORMEE: "Commandée", EXPIREE: "Expirée", ANNULEE: "Annulée" };
+  return m[s] || s;
+}
+
+async function accepter(id, numero) {
+  const ref = prompt(`Le client accepte ${numero}.\n\nRéférence de son bon de commande :`);
+  if (!ref) return;
+  try {
+    const r = await DML.api(`/api/v1/facturation/proformas/${id}/commande`, {
+      method: "POST",
+      body: JSON.stringify({
+        reference_client: ref,
+        date_commande: new Date().toISOString().slice(0, 10),
+      }),
+    });
+    DML.message("msg",
+      `Commande ${r.numero} créée depuis ${r.proforma} — ${DML.kg(r.tonnage_kg)} à ${r.prix_kg} F/kg.`, "ok");
+    listerProformas();
+    listerCommandes();
+  } catch (e) { DML.message("msg", e.message, "erreur"); }
+}
+
+init();
+</script>
+</body>
+</html>

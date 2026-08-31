@@ -215,6 +215,11 @@ class Proforma(DocumentModel):
     )
     date_reponse_client: Mapped[Optional[date]] = mapped_column(Date)
     motif_refus: Mapped[Optional[str]] = mapped_column(Text)
+    proforma_origine_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("proformas.id", ondelete="SET NULL"), index=True,
+        comment="Proforma revisee : garde la trace de la negociation"
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     pdf_url: Mapped[Optional[str]] = mapped_column(String(500))
 
     client: Mapped[Client] = relationship(back_populates="proformas")
@@ -240,7 +245,15 @@ class LigneProforma(BaseModel):
     prix_unitaire: Mapped[Decimal] = mapped_column(Money, nullable=False)
     remise_taux: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0"), nullable=False)
     montant_ht: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
-    taux_tva: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0.1925"), nullable=False)
+    taux_tva: Mapped[Decimal] = mapped_column(
+        Rate, default=Decimal("0"), nullable=False,
+        comment="0 par defaut : DML est au SMT et ne facture pas la TVA. "
+                "Passer a 0.1925 si le regime change."
+    )
+    tva_applicable: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False,
+        comment="Coche a la facture si la TVA doit etre appliquee"
+    )
     montant_ttc: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
 
     proforma: Mapped[Proforma] = relationship(back_populates="lignes")
@@ -322,7 +335,7 @@ class LigneBonCommande(BaseModel):
     prix_unitaire: Mapped[Decimal] = mapped_column(Money, nullable=False)
     remise_taux: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0"), nullable=False)
     montant_ht: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
-    taux_tva: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0.1925"), nullable=False)
+    taux_tva: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0"), nullable=False)
     montant_ttc: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
     specifications_qualite: Mapped[Optional[str]] = mapped_column(Text)
 
@@ -466,7 +479,7 @@ class FactureVente(DocumentModel):
     montant_ht: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
     remise_globale: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
     base_taxable: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
-    taux_tva: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0.1925"), nullable=False)
+    taux_tva: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0"), nullable=False)
     montant_tva: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
     precompte: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
     frais_transport: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
@@ -535,7 +548,7 @@ class LigneFactureVente(BaseModel):
     prix_unitaire: Mapped[Decimal] = mapped_column(Money, nullable=False)
     remise_taux: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0"), nullable=False)
     montant_ht: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
-    taux_tva: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0.1925"), nullable=False)
+    taux_tva: Mapped[Decimal] = mapped_column(Rate, default=Decimal("0"), nullable=False)
     montant_tva: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
     montant_ttc: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)
     cout_revient_unitaire: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"), nullable=False)

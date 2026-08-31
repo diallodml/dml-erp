@@ -166,3 +166,58 @@ body.connexion{
   .barre{padding:10px 14px}
   .barre nav{width:100%;margin-left:0}
 }
+
+/* ===== ÉTATS D'INTERACTION ===== */
+button, select, a, [role="tab"], input[type=checkbox]{cursor:pointer}
+input, textarea{cursor:text}
+
+.bouton{
+  transition:background .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+.bouton:hover{transform:translateY(-1px);box-shadow:0 2px 0 rgba(20,38,31,.22)}
+.bouton:active{transform:translateY(0);box-shadow:none}
+.bouton.secondaire:hover{transform:translateY(-1px);box-shadow:0 2px 0 rgba(20,38,31,.14)}
+
+tbody tr{transition:background .12s ease}
+tbody tr:hover{background:rgba(232,163,23,.09)}
+tbody tr:hover td{border-bottom-color:var(--trait)}
+
+.onglets button{transition:background .14s ease, box-shadow .14s ease, color .14s ease}
+.onglets button:hover:not([aria-selected="true"]){background:var(--sisal-2);color:var(--texte)}
+
+.filtres button{transition:background .14s ease, border-color .14s ease, color .14s ease}
+.filtres button:hover:not([aria-pressed="true"]){border-color:var(--encre);color:var(--texte)}
+
+.carte{transition:background .14s ease}
+.cartes .carte:hover{background:#FAFBF8}
+
+.barre nav a{transition:background .14s ease}
+
+input:hover:not(:focus), select:hover:not(:focus), textarea:hover:not(:focus){
+  border-color:var(--texte-doux);
+}
+
+:focus-visible{outline:2px solid var(--mais);outline-offset:2px}
+button:focus-visible, a:focus-visible{outline-offset:1px}
+
+.alerte-ligne{transition:background .14s ease}
+.alerte-ligne:hover{background:#FAFBF8}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important}
+  .bouton:hover{transform:none}
+}
+
+/* ===== HISTORIQUE DE NÉGOCIATION ===== */
+.negociation{border-left:2px solid var(--trait);margin-left:9px;padding-left:20px}
+.etape{position:relative;padding:11px 0}
+.etape::before{
+  content:"";position:absolute;left:-27px;top:17px;
+  width:11px;height:11px;border-radius:50%;
+  background:var(--sisal-2);border:2px solid var(--trait);
+}
+.etape.retenue::before{background:var(--gain);border-color:var(--gain)}
+.etape.refusee::before{background:var(--sisal);border-color:var(--perte)}
+.etape .prix{font-family:var(--data);font-size:17px;font-weight:600}
+.etape .prix.retenu{color:var(--gain)}
+.etape .qui{font-size:12.5px;color:var(--texte-doux);display:block;margin-top:2px}

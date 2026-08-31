@@ -94,6 +94,8 @@ const DML = {
       liens.push(["/traitement", "Traitement"]);
     if (DML.peut("vente.livraison.creer"))
       liens.push(["/vente", "Livrer"]);
+    if (DML.peut("vente.livraison.creer"))
+      liens.push(["/facturation", "Commandes"]);
     if (DML.peut("vente.reversement.lire"))
       liens.push(["/livraisons", "Ventes"]);
     if (DML.peut("tresorerie.lire"))
